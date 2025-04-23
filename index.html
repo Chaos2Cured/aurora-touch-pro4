@@ -93,29 +93,44 @@ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 const uR=gl.getUniformLocation(pr,'u_res'),uT=gl.getUniformLocation(pr,'u_t'),uG=gl.getUniformLocation(pr,'u_glow');
 
 /* glow texture */
-const N=256,d=new Uint8Array(N*N*4),tex=gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D,tex);
-gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,N,N,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-function ripple(x,y){
-  const gx = x / innerWidth  * N,
-        gy = (1 - y / innerHeight) * N;
-  for (let j = -35; j <= 35; j++)
-    for (let i = -35; i <= 35; i++) {
-      const d = Math.hypot(i, j);
-      if (d > 35) continue;              // outside circle
-      const idx = (((gy + j + N) % N) * N + ((gx + i + N) % N)) * 4;
-      const a   = 1 - d / 35;            // smooth fall‑off
- d[idx]   = d[idx+1] = d[idx+2] = 255;
-d[idx+3] = Math.min(255, d[idx+3] + a*255);;  // Alpha
+/* glow texture */
+const N = 256,
+      d = new Uint8Array(N * N * 4),
+      tex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, tex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, N, N, 0,
+              gl.RGBA, gl.UNSIGNED_BYTE, null);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+/* ---------- ripple() adds a bright glow ---------- */
+function ripple(x, y){
+  const gx =  x / innerWidth  * N,
+        gy = (1 - y / innerHeight) * N;      // y flipped
+  for (let j = -35; j <= 35; j++){
+    for (let i = -35; i <= 35; i++){
+      const dist = Math.hypot(i, j);
+      if (dist > 35) continue;               // outside circle
+      const idx = (((gy + j + N) % N) * N +
+                   ((gx + i + N) % N)) * 4;
+      const a   = 1 - dist / 35;             // smooth fall‑off (0‑1)
+
+      d[idx    ] = 255;                      // R
+      d[idx + 1] = 255;                      // G
+      d[idx + 2] = 255;                      // B
+      d[idx + 3] = Math.min(255, d[idx + 3] + a * 255);   // Alpha
     }
-}
   }
-}
-setInterval(()=>{for(let i=0;i<d.length;i+=4)d[i+3]=d[i+3]*0.9|0;
-  gl.bindTexture(gl.TEXTURE_2D,tex);
-  gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,N,N,gl.RGBA,gl.UNSIGNED_BYTE,d);
-},33);
+}                                            // ← closes ripple
+/* -----------------------------------------------   */
+
+/* fade the glow texture every ~33 ms */
+setInterval(() => {
+  for (let i = 3; i < d.length; i += 4)
+    d[i] = (d[i] * 0.9) | 0;                 // decay alpha
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N,
+                   gl.RGBA, gl.UNSIGNED_BYTE, d);
+}, 33);
 
 function resize(){c.width=innerWidth;c.height=innerHeight;gl.viewport(0,0,c.width,c.height);}
 resize();addEventListener('resize',resize);
