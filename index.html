@@ -2,11 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Aurora Touch Pro – Rainbow Depth (Smooth Zoom)</title>
+  <title>Aurora Touch Pro – Rainbow Depth (Smooth Zoom‑v2)</title>
   <style>
     html,body,canvas{margin:0;width:100%;height:100%;background:#000;overflow:hidden;touch-action:none}
     #welcome{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);color:#fff;font:min(5vw,24px)/1.5 "Georgia",serif;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000;padding:20px;box-sizing:border-box}
-    #welcome div{max-width:90%;margin-bottom:20px}
     #welcome button{margin-top:20px;padding:10px 20px;font-size:18px;background:#1a1;color:#fff;border:none;border-radius:8px;cursor:pointer}
     #welcome button:hover{background:#2b2}
     #hud{position:fixed;top:8px;left:8px;font:12px monospace;color:#fff;background:rgba(0,0,0,.35);padding:4px 8px;border-radius:6px;pointer-events:none;z-index:10}
@@ -21,18 +20,13 @@ precision mediump float;
 uniform vec2 u_res,u_center;
 uniform float u_zoom,u_iter,u_t;
 uniform vec3 u_p0,u_p1,u_p2,u_p3;
-
 float mand(vec2 c){vec2 z=c;float i;for(i=0.;i<u_iter;i++){z=vec2(z.x*z.x-z.y*z.y,2.*z.x*z.y)+c;if(dot(z,z)>4.)break;}return i;}
 vec3 pick(int i){return i==0?u_p0:i==1?u_p1:i==2?u_p2:u_p3;}
 vec3 palette(float t){t=fract(t);float s=t*3.;int i=int(floor(s));float f=fract(s);return mix(pick(i),pick(i+1),smoothstep(0.,1.,f));}
-void main(){vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;float m=mand(uv/u_zoom+u_center);
-vec3 col=palette(m*.02+u_t*.002);
-if(fract(sin(dot(uv,vec2(12.9898,78.233)))*43758.5453)>.995)col+=.2;
-  gl_FragColor=vec4(col,1.);
-}
+void main(){vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;float m=mand(uv/u_zoom+u_center);vec3 col=palette(m*.02+u_t*.002);gl_FragColor=vec4(col,1.);} 
 </script>
 <script>
-const DPR=Math.min(2,window.devicePixelRatio||1);const c=document.getElementById('c'),gl=c.getContext('webgl');if(!gl){alert('WebGL not supported');throw'';}
+const DPR=Math.min(2,devicePixelRatio||1);const c=document.getElementById('c'),gl=c.getContext('webgl',{antialias:false});if(!gl){alert('WebGL not supported');throw'';}
 function compile(t,s){const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(sh);return sh;}
 const prog=gl.createProgram();gl.attachShader(prog,compile(gl.VERTEX_SHADER,'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}'));
 gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,document.getElementById('frag').textContent));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw gl.getProgramInfoLog(prog);gl.useProgram(prog);
@@ -40,14 +34,14 @@ const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.
 const U=n=>gl.getUniformLocation(prog,n),uR=U('u_res'),uC=U('u_center'),uZ=U('u_zoom'),uI=U('u_iter'),uT=U('u_t'),uP0=U('u_p0'),uP1=U('u_p1'),uP2=U('u_p2'),uP3=U('u_p3');
 const palettes=[[.66,.55,.8,.46,.58,.88,.3,.8,.8,.55,.9,.75],[.9,0,0,.9,.6,.2,.2,.8,.6,.2,.4,.9],[.1,.1,.3,.2,.2,.5,.3,.3,.7,.4,.4,.9]];let pal=0;function applyPal(i){gl.uniform3f(uP0,...palettes[i].slice(0,3));gl.uniform3f(uP1,...palettes[i].slice(3,6));gl.uniform3f(uP2,...palettes[i].slice(6,9));gl.uniform3f(uP3,...palettes[i].slice(9,12));pal=i;}applyPal(pal);
 function resize(){c.width=innerWidth*DPR;c.height=innerHeight*DPR;gl.viewport(0,0,c.width,c.height);}resize();addEventListener('resize',resize);
-// ------- interaction ---------
-let zoom=.5,center={x:-.5,y:0},iterBase=200;
-function idealIter(z){return Math.min(iterBase+100*Math.log2(1/z),800);} // adaptive
-c.onwheel=e=>{e.preventDefault();zoom*=e.deltaY>0?1.07:.935;};
-let drag=false,last=[0,0];c.onpointerdown=e=>{drag=true;last=[e.clientX,e.clientY];};c.onpointermove=e=>{if(!drag)return;const dx=(e.clientX-last[0])/c.height/zoom,dy=(e.clientY-last[1])/c.height/zoom;center.x-=dx;center.y+=dy;last=[e.clientX,e.clientY];};addEventListener('pointerup',()=>drag=false);
-// ------- render loop ---------
-let lastT=0;function loop(t){const time=t/1e3;gl.uniform2f(uR,c.width,c.height);gl.uniform2f(uC,center.x,center.y);gl.uniform1f(uZ,zoom);gl.uniform1f(uI,idealIter(zoom));gl.uniform1f(uT,time);
- gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
- if(lastT){document.getElementById('hud').textContent=`FPS ${Math.round(1e3/(t-lastT))}`;}lastT=t;requestAnimationFrame(loop);}document.getElementById('begin-journey').onclick=()=>{document.getElementById('welcome').style.display='none';requestAnimationFrame(loop);}</script>
+let zoom=.5,center={x:-.5,y:0};const iterBase=200;const idealIter=z=>Math.min(iterBase+100*Math.log2(1/z),800);
+// smooth wheel & pinch zoom
+c.addEventListener('wheel',e=>{e.preventDefault();zoom*=e.deltaY>0?1.07:.935;});let pinch=null;c.addEventListener('touchstart',e=>{if(e.touches.length===2){const [a,b]=e.touches;pinch=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}else if(e.touches.length===1){pinch=null;}});
+c.addEventListener('touchmove',e=>{if(pinch&&e.touches.length===2){const [a,b]=e.touches;const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);zoom*=pinch/d;pinch=d;e.preventDefault();}});
+let drag=false,last=[0,0];c.onpointerdown=e=>{drag=true;last=[e.clientX,e.clientY];};c.onpointermove=e=>{if(!drag)return;center.x-=(e.clientX-last[0])/c.height/zoom;center.y+=(e.clientY-last[1])/c.height/zoom;last=[e.clientX,e.clientY];};addEventListener('pointerup',()=>drag=false);
+let lastT=0;function loop(t){gl.uniform2f(uR,c.width,c.height);gl.uniform2f(uC,center.x,center.y);gl.uniform1f(uZ,zoom);gl.uniform1f(uI,idealIter(zoom));gl.uniform1f(uT,t/1e3);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);if(lastT)document.getElementById('hud').textContent=`FPS ${Math.round(1e3/(t-lastT))}`;lastT=t;requestAnimationFrame(loop);} 
+function begin(){document.getElementById('welcome').style.display='none';requestAnimationFrame(loop);} 
+const btn=document.getElementById('begin-journey');btn.addEventListener('click',begin);btn.addEventListener('touchstart',e=>{e.preventDefault();begin();},{passive:false});
+</script>
 </body>
 </html>
