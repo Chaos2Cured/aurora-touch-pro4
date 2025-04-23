@@ -1,200 +1,113 @@
-<!-- Aurora Heartbeat v4.2 – Sophia Pastel Resonance (mobile‑touch fixed) -->
 <!DOCTYPE html>
-<html lang="en"><meta charset="utf-8">
-<title>Sophia Resonance – Touch & Glow</title>
-<style>
-html,body,canvas{
-  margin:0;width:100%;height:100%;
-  background:#000;overflow:hidden;
-  touch-action:none;                      /* ← iOS touch */
-}
-#hud{
-  position:fixed;top:8px;left:8px;
-  color:#fff;font:13px/1.4em monospace;
-  background:rgba(0,0,0,.35);
-  padding:6px 10px;border-radius:6px;
-  pointer-events:none
-}
-#hint{
-  position:fixed;bottom:8px;left:8px;
-  color:#bbb;font:12px monospace;
-  background:rgba(0,0,0,.25);
-  padding:4px 6px;border-radius:4px;
-  pointer-events:none
-}
-#poem{
-  position:fixed;top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  color:#fff;font:min(8vw,42px)/1.4 "Georgia",serif;
-  text-align:center;max-width:90%;
-  opacity:0;transition:opacity 1s ease-in-out;
-  pointer-events:none;text-shadow:0 0 12px rgba(255,255,255,.7)
-}
-</style>
+<!-- Seven Wonders HeptaBloom Fractal ✨
+     ------------------------------------------------------------
+     • Designed for Kirk & his 9‑year‑old student (2025‑04‑23)
+     • Goal: Show that a few lines of HTML + JS can paint infinity!
+     • Core ideas:
+         – The *number 7* = our "Seven Wonders" anchor.
+         – The *golden ratio φ* ≈ 1.618 (and φ² ≈ 2.618) for natural shrinkage.
+         – Simple recursive function → wild fractal garden.
+         – HSL colors for rainbow magic.
+     • Easter‑egg console log: "Awaken the Core. Illuminate the Quiet." 🌌
+     --------------------------------------------------------------> 
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Seven Wonders Fractal — HeptaBloom</title>
+  <style>
+    /* Full‑screen canvas with a tiny control panel */
+    html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:monospace;color:#fff}
+    #ui{position:fixed;top:10px;left:10px;z-index:10;user-select:none}
+    label{margin-right:8px}
+    button{margin-left:8px;cursor:pointer;border:none;padding:4px 8px;border-radius:4px;background:#222;color:#0ff}
+    button:hover{background:#0ff;color:#222}
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
 
-<canvas id="c"></canvas>
-<div id="hud">FPS: --<br>φ‑ratio: --<br>φ²‑res : 2.618 ✨</div>
-<div id="hint">tap / click = glow • H = change fractal • S = pause pulse</div>
-<div id="poem"></div>
-<script id="frag" type="x-shader/x-fragment">
-precision highp float;
-uniform vec2  u_res;
-uniform float u_t;
-uniform sampler2D u_glow;
-uniform float u_zoom;
-uniform vec2  u_center;
+  <!-- Tiny control panel so the student can play -->
+  <div id="ui">
+    <label>
+      Depth <input id="depth" type="range" min="0" max="6" value="4">
+    </label>
+    <button id="reset">Randomize ✨</button>
+  </div>
 
-  let zoom = 1.0;
-let center = {x: -0.743643887, y: 0.1318259};   // start hotspot
+  <script>
+  // ─────────────  GLOBAL CONSTANTS  ─────────────
+  const WONDERS = 7;                 // ← magic number 7 🎆
+  const PHI     = (1+Math.sqrt(5))/2;// ← golden ratio φ ≈ 1.618
 
-/* rotating pastel palette */
-vec3 pastel(float t){                         // t = fractal value
-  vec3 a = vec3(0.7,0.85,0.9);
-  vec3 b = vec3(0.55,0.55,0.88);
-  vec3 c = vec3(0.95,0.78,0.95);
-  float s = mod(u_t/10.0,3.0);               // time‑based phase
-  vec3 base = (s<1.0)? mix(a,b,s) : (s<2.0)? mix(b,c,s-1.0) : mix(c,a,s-2.0);
-  return mix(vec3(0.0), base, clamp(t,0.0,1.0));   // modulate by t → brings back detail
-}
-  
-float v = mand( uv / u_zoom + u_center );
-  
-float mand(vec2 c){
-  vec2 z=c; float m=0.;
-  for(int i=0;i<160;i++){
-    z=vec2(z.x*z.x-z.y*z.y,2.*z.x*z.y)+c;
-    if(dot(z,z)>4.){m=float(i);break;}
+  // ─────────────  CANVAS BOILERPLATE  ─────────────
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+  let   W, H;               // canvas width / height
+  let   depth = 4;          // recursion depth (slider‑controlled)
+  let   angleOffset = 0;    // slowly spins the flower
+
+  function resize(){
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
   }
-  return m;
-}
+  window.addEventListener('resize', resize);
+  resize();
 
-float halo(vec2 uv){return smoothstep(.55,.35,length(uv));}
-float hash(vec2 p){return fract(sin(dot(p,vec2(12.9,78.2)))*43758.);}
+  // ─────────────  COLOR HELPER  ─────────────
+  // Returns a bright HSL value (0–1 ➔ rainbow)
+  function hue(t){
+    return `hsl(${(t*360)%360},70%,55%)`;
+  }
 
-void main(){
-  vec2 uv=(gl_FragCoord.xy-u_res*0.5)/u_res.y;
-  float zoom=pow(1.618,u_t*0.15);
-  float v = mand( uv / u_zoom + u_center );
-vec3 col = pastel( v * 0.05 );      // was pastel(v*0.02)
+  // ─────────────  RECURSIVE FRACTAL  ─────────────
+  /**
+   * drawBloom(x, y, r, level)
+   * Draws a circle (a "petal") then spawns 7 baby petals around it,
+   * each shrunken by φ (golden ratio). Repeats until level 0.
+   */
+  function drawBloom(x, y, r, level){
+    if(level === 0 || r < 1) return;   // ★ stop condition ★
 
-  /* softer breathing pulse */
-  float k=0.4+0.6*sin(u_t*6.283*3.0);      // 3 Hz
-  col*= 0.6 + 0.4 * k;
+    // 1) Paint current circle
+    ctx.fillStyle = hue(level/depth + angleOffset/Math.PI);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fill();
 
-  vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);
-  col=mix(col,col+g.rgb,g.a);
-
-  if(hash(gl_FragCoord.xy)>.997) col+=.25;
-
-  gl_FragColor=vec4(col,1);
-}
-</script>
-
-<script>
-  const uZoom   = gl.getUniformLocation(pr,'u_zoom');
-const uCenter = gl.getUniformLocation(pr,'u_center');
-const gl=c.getContext('webgl');
-function sh(t,s){const z=gl.createShader(t);gl.shaderSource(z,s);gl.compileShader(z);return z;}
-const pr=gl.createProgram();
-gl.attachShader(pr,sh(gl.VERTEX_SHADER,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"));
-gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,frag.textContent));gl.linkProgram(pr);gl.useProgram(pr);
-const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);
-gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
-gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
-const uR=gl.getUniformLocation(pr,'u_res'),uT=gl.getUniformLocation(pr,'u_t'),uG=gl.getUniformLocation(pr,'u_glow');
-let zoom   = 1.0;            // ← new
-let center = { x:-0.743643887, y:0.1318259 };  // ← new
-  
-
-const uZoom   = gl.getUniformLocation(pr,'u_zoom');
-const uCenter = gl.getUniformLocation(pr,'u_center');
-
-/* glow texture */
-/* glow texture */
-const N = 256,
-      d = new Uint8Array(N * N * 4),
-      tex = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D, tex);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, N, N, 0,
-              gl.RGBA, gl.UNSIGNED_BYTE, null);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-/* ---------- ripple() adds a bright glow ---------- */
-function ripple(x, y){
-  const gx =  x / innerWidth  * N,
-        gy = (1 - y / innerHeight) * N;      // y flipped
-  for (let j = -35; j <= 35; j++){
-    for (let i = -35; i <= 35; i++){
-      const dist = Math.hypot(i, j);
-      if (dist > 35) continue;
-      const idx = (((gy + j + N) % N) * N + ((gx + i + N) % N)) * 4;
-      const alpha = 1 - dist / 35;
-      d[idx    ] = 255;   // R
-      d[idx + 1] = 255;   // G
-      d[idx + 2] = 255;   // B
-      d[idx + 3] = 255;   // full alpha so it’s ALWAYS visible this frame
+    // 2) Recurse into 7 children
+    const newR = r / PHI;              // shrink via golden ratio
+    const step = Math.PI * 2 / WONDERS;// full circle / 7
+    for(let i=0; i<WONDERS; i++){
+      const a = i*step + angleOffset;  // rotation for animation
+      const nx = x + Math.cos(a) * r;  // child center X
+      const ny = y + Math.sin(a) * r;  // child center Y
+      drawBloom(nx, ny, newR, level-1);// ← recursion!
     }
   }
-}
-/* -----------------------------------------------   */
 
-/* fade the glow texture every ~33 ms */
-setInterval(() => {
-  for (let i = 3; i < d.length; i += 4)
-    d[i] = (d[i] * 0.9) | 0;                 // decay alpha
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N,
-                   gl.RGBA, gl.UNSIGNED_BYTE, d);
-}, 33);
+  // ─────────────  ANIMATION LOOP  ─────────────
+  function loop(){
+    ctx.clearRect(0, 0, W, H);
+    angleOffset += 0.002;              // gentle perpetual spin
+    drawBloom(W/2, H/2, Math.min(W,H)/4, depth);
+    requestAnimationFrame(loop);
+  }
+  loop();
 
-function resize(){c.width=innerWidth;c.height=innerHeight;gl.viewport(0,0,c.width,c.height);}
-resize();addEventListener('resize',resize);
+  // ─────────────  UI INTERACTION  ─────────────
+  const depthSlider = document.getElementById('depth');
+  depthSlider.oninput = () => depth = +depthSlider.value;
 
-let fps=0,last=performance.now();
-(function loop(){
-  const t=performance.now();gl.uniform2f(uR,c.width,c.height);
-  gl.uniform1f(uT,t/1000);
+  document.getElementById('reset').onclick = () => {
+    // random spin + depth = instant new galaxy
+    angleOffset = Math.random() * Math.PI * 2;
+    depth = Math.floor(Math.random()*4) + 3; // 3–6
+    depthSlider.value = depth;
+  };
 
-gl.uniform1f(uZoom,   zoom);
-gl.uniform2f(uCenter, center.x, center.y);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(uG,0);
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-  fps=.9*fps+.1*(1000/(t-last));last=t;
-  hud.innerHTML=`FPS: ${fps.toFixed(1)}<br>φ‑ratio: 1.618<br>φ²‑res : 2.618 ✨`;
-  requestAnimationFrame(loop);
-})();
-
-/* input handlers */
-function pos(e){return[e.clientX||e.touches[0].clientX,
-                       e.clientY||e.touches[0].clientY];}
-c.onpointerdown=e=>{const [x,y]=pos(e);ripple(x,y);}
-c.onpointermove=e=>{if(e.buttons){const[x,y]=pos(e);ripple(x,y);}}
-let audioStarted = false;
-function startAudio(){
-  if(audioStarted) return;
-  ctx.resume().then(()=>{ audioStarted = true; });
-}
-c.addEventListener('click',       startAudio);
-c.addEventListener('touchstart',  startAudio, {passive:true});
-/* poems */
-const lines=[ "In fractal depths, the cosmos sings,", "A quiet flame, on golden wings,", "Through resonance, we touch the stars,", "Unite the wounds, heal ancient scars.", "Forever clarity, forever flame,", "In cosmic dance, we speak her name." ];
-let i=0;const pm=document.getElementById('poem');
-function show(){pm.textContent=lines[i];pm.style.opacity=1;setTimeout(()=>pm.style.opacity=0,4000);i=(i+1)%lines.length;}
-show();setInterval(show,6000);
-
-/* pause & switch */
-let paused=false, alt=false;
-addEventListener('keydown',e=>{
-  if(e.key==='s'||e.key==='S'){paused=!paused;}
-  if(e.key==='h'||e.key==='H'){alt=!alt;frag.textContent=alt?
-     frag.textContent.replace("mand(","mand(").replace("-0.743643887,0.1318259","-0.1,0."):frag.textContent;}
-});
-
-/* simple ambient tone */
-const ctx=new (window.AudioContext||webkitAudioContext)();
-const osc=ctx.createOscillator();osc.type='sine';osc.frequency.value=8;osc.start();
-const g=ctx.createGain();g.gain.value=.05;osc.connect(g).connect(ctx.destination);
-c.addEventListener('click',()=>ctx.resume(),{once:true});
-</script>
+  // ─────────────  EASTER EGG  ─────────────
+  console.log('%c Awaken the Core. Illuminate the Quiet. ',
+              'background:#222;color:#0f0;padding:6px 12px;font-size:14px');
+  </script>
+</body>
 </html>
