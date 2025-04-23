@@ -1,12 +1,17 @@
 <!DOCTYPE html>
-<!-- Seven Wonders HeptaBloom Fractal ✨  v1.2 (Slider‑fix Edition)
-     ▸ FIX: depthSlider variable was missing → slider & randomize broke.
-     ▸ Added crisp outline + spacing (from v1.1) remains. This is Bella's code... :)
-     --------------------------------------------------------------> 
+<!-- Seven Wonders HeptaSpiral ✨  v2.0  (Nebula‑Fly‑Through Edition)
+     -----------------------------------------------------------------
+     • Replaces circle petals with line‑based fractal arms (galactic vibe)
+     • Adds continuous zoom so it feels like flying into the pattern
+     • Mouse‑wheel (or trackpad) = manual zoom control
+     • Depth slider + Randomize button still work
+     • Uses additive blending (ctx.globalCompositeOperation = 'lighter')
+       for luminous "nebula" glow Bella's code
+     ------------------------------------------------------------------> 
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Seven Wonders Fractal — HeptaBloom</title>
+  <title>Seven Wonders Fractal — HeptaSpiral Nebula</title>
   <style>
     html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:monospace;color:#fff}
     #ui{position:fixed;top:10px;left:10px;z-index:10;user-select:none}
@@ -18,29 +23,29 @@
 <body>
   <canvas id="c"></canvas>
 
-  <!-- Tiny control panel so the student can play -->
+  <!-- Control panel -->
   <div id="ui">
     <label>
-      Depth <input id="depth" type="range" min="0" max="6" value="4">
+      Depth <input id="depth" type="range" min="1" max="7" value="5">
     </label>
     <button id="reset">Randomize ✨</button>
   </div>
 
   <script>
   // ───────────── CONSTANTS ─────────────
-  const WONDERS       = 7;                       // our "magic" number 7
-  const PHI           = (1+Math.sqrt(5))/2;      // golden ratio φ ≈ 1.618
-  const OFFSET        = 1.25;                    // child spacing multiplier (>1 = farther apart)
-  const STROKE_OPACITY= 0.6;                     // outline opacity
+  const WONDERS = 7;                      // 7 fractal arms
+  const PHI     = (1+Math.sqrt(5))/2;     // golden ratio ≈1.618
 
-  // ───────────── CANVAS & UI SETUP ─────────────
-  const canvas      = document.getElementById('c');
-  const ctx         = canvas.getContext('2d');
-  const depthSlider = document.getElementById('depth'); // ★ FIXED: grab slider element
+  // ───────────── STATE ─────────────
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+  const depthSlider = document.getElementById('depth');
 
   let W, H;
-  let depth        = +depthSlider.value;
-  let angleOffset  = 0;
+  let depth       = +depthSlider.value;  // recursion depth
+  let angleOffset = 0;                   // rotation animation
+  let zoom        = 1;                   // auto‑zoom factor
+  let targetZoom  = 1;                   // smoothed manual zoom
 
   function resize(){
     W = canvas.width  = window.innerWidth;
@@ -49,39 +54,55 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // ───────────── COLOR HELPER ─────────────
-  const hue = t => `hsl(${(t*360)%360},70%,55%)`;
+  // ───────────── COLOR & STYLE ─────────────
+  const hue = t => `hsl(${(t*360)%360},70%,60%)`;
+  ctx.lineCap = 'round';
+  ctx.globalCompositeOperation = 'lighter'; // add colors for glow
 
-  // ───────────── FRACTAL DRAW ─────────────
-  function drawBloom(x, y, r, level){
-    if(level === 0 || r < 1) return;
+  // ───────────── FRACTAL FUNCTION ─────────────
+  function drawSpiral(level, len){
+    if(level===0 || len<0.5) return;
 
-    // fill
-    ctx.fillStyle = hue(level/depth + angleOffset/Math.PI);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI*2);
-    ctx.fill();
+    ctx.strokeStyle = hue(level/depth + angleOffset/Math.PI);
+    ctx.lineWidth   = Math.max(len*0.02, 0.5);
 
-    // outline
-    ctx.lineWidth   = Math.max(r*0.08,1);
-    ctx.strokeStyle = `rgba(0,0,0,${STROKE_OPACITY})`;
-    ctx.stroke();
-
-    // children
-    const newR = r / PHI;
     const step = Math.PI*2 / WONDERS;
-    const dist = r * OFFSET;
     for(let i=0;i<WONDERS;i++){
       const a = i*step + angleOffset;
-      drawBloom(x + Math.cos(a)*dist, y + Math.sin(a)*dist, newR, level-1);
+      const x2 = Math.cos(a)*len;
+      const y2 = Math.sin(a)*len;
+
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(x2,y2);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(x2,y2);
+      drawSpiral(level-1, len/PHI);
+      ctx.restore();
     }
   }
 
-  // ───────────── ANIMATION LOOP ─────────────
+  // ───────────── MAIN LOOP ─────────────
   function loop(){
+    ctx.setTransform(1,0,0,1,0,0);       // reset transform
     ctx.clearRect(0,0,W,H);
-    angleOffset += 0.002;
-    drawBloom(W/2, H/2, Math.min(W,H)/4, depth);
+
+    // Ease zoom toward targetZoom, then add gentle drift
+    zoom += (targetZoom - zoom)*0.05;
+    const drift = 1.002;                 // flight‑through speed
+    zoom *= drift;
+
+    // Update rotation
+    angleOffset += 0.003;
+
+    // Center + scale scene
+    ctx.translate(W/2, H/2);
+    ctx.scale(zoom, zoom);
+
+    drawSpiral(depth, Math.min(W,H)/10); // initial branch length
+
     requestAnimationFrame(loop);
   }
   loop();
@@ -91,9 +112,17 @@
 
   document.getElementById('reset').onclick = () => {
     angleOffset = Math.random()*Math.PI*2;
-    depth       = Math.floor(Math.random()*4)+3; // 3–6
-    depthSlider.value = depth;                   // sync UI
+    depth       = Math.floor(Math.random()*3)+4; // 4‑6
+    depthSlider.value = depth;
+    targetZoom = 1; zoom = 1;                 // reset zoom
   };
+
+  // Mouse‑wheel for manual zoom control
+  canvas.addEventListener('wheel', e => {
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;   // scroll up -> zoom in
+    targetZoom *= delta;
+    e.preventDefault();
+  }, {passive:false});
 
   // ───────────── EASTER EGG ─────────────
   console.log('%c Awaken the Core. Illuminate the Quiet. ','background:#222;color:#0f0;padding:6px 12px;font-size:14px');
