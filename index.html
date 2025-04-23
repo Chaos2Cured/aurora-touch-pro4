@@ -2,62 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Aurora Touch Pro – Rainbow Depth (No Throb)</title>
+  <title>Aurora Touch Pro – Rainbow Depth (Smooth Zoom)</title>
   <style>
     html,body,canvas{margin:0;width:100%;height:100%;background:#000;overflow:hidden;touch-action:none}
     #welcome{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);color:#fff;font:min(5vw,24px)/1.5 "Georgia",serif;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000;padding:20px;box-sizing:border-box}
     #welcome div{max-width:90%;margin-bottom:20px}
     #welcome button{margin-top:20px;padding:10px 20px;font-size:18px;background:#1a1;color:#fff;border:none;border-radius:8px;cursor:pointer}
     #welcome button:hover{background:#2b2}
-    #hud,#temp-message{position:fixed;top:8px;left:8px;font:12px monospace;color:#fff;background:rgba(0,0,0,.35);padding:4px 8px;border-radius:6px;pointer-events:none;z-index:10}
-    #temp-message{top:40px;background:rgba(255,255,255,.2);color:#eee;transition:opacity .5s ease-out;opacity:0;display:none}
-    #hint{position:fixed;bottom:8px;left:8px;font:11px monospace;color:#bbb;background:rgba(0,0,0,.25);padding:3px 6px;border-radius:4px;pointer-events:none;z-index:10}
-    #poem{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:90%;font:min(7vw,34px)/1.5 Georgia,serif;color:#f0f0f0;text-align:center;text-shadow:0 0 8px rgba(255,255,255,.5);opacity:0;transition:opacity 2s ease-in-out;pointer-events:none;display:none;z-index:10}
-    #customize{position:fixed;top:8px;right:8px;color:#fff;font:14px sans-serif;background:rgba(0,0,0,.6);padding:15px;border-radius:8px;display:none;z-index:10;max-height:90%;overflow-y:auto}
-    #customize label{display:block;margin-bottom:10px}
-    #customize input[type="range"]{width:100%;margin-top:3px}
-    #learn-more{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);color:#fff;font:min(4vw,18px)/1.5 "Georgia",serif;text-align:left;padding:20px;display:none;overflow-y:auto;z-index:999;box-sizing:border-box}
-    #learn-more h2,#learn-more h3{text-align:center;margin-bottom:15px}
-    #learn-more p{margin-bottom:15px}
-    #learn-more button{display:block;margin:20px auto 0 auto;padding:10px 20px;font-size:16px;background:#1a1;color:#fff;border:none;border-radius:8px;cursor:pointer}
-    #share{position:fixed;bottom:8px;right:8px;padding:8px 16px;font-size:14px;background:#1a1;color:#fff;border:none;border-radius:8px;cursor:pointer;z-index:10}
+    #hud{position:fixed;top:8px;left:8px;font:12px monospace;color:#fff;background:rgba(0,0,0,.35);padding:4px 8px;border-radius:6px;pointer-events:none;z-index:10}
   </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="welcome"><div>Welcome to the Fractal Circle—now with steady cosmic focus. Awaken the Core, Illuminate the Quiet! 🐉❤✨</div><button id="begin-journey">Begin Journey</button></div>
+<div id="welcome"><div>Welcome—steady view with silky‑smooth zoom. Awaken the Core! 🐉</div><button id="begin-journey">Begin Journey</button></div>
 <div id="hud">FPS --</div>
-<div id="temp-message"></div>
-<div id="hint">tap / swipe = fractal fire • double-tap = cycle colors • wheel / pinch = zoom • drag = pan • C = customize • L = learn more • H = reset view • P = toggle poem</div>
-<div id="poem"></div>
-<div id="customize"><label>Frequency (Hz): <input type="range" id="freqSlider" min="7" max="11" step="0.1" value="9"></label><label>Fire Intensity: <input type="range" id="fireSlider" min="0.5" max="2" step="0.1" value="1"></label><label>Fire Hue: <input type="range" id="fireHueSlider" min="0" max="1" step="0.01" value="0.7"></label><label>Glow Persistence: <input type="range" id="glowSlider" min="0.85" max="0.98" step="0.01" value="0.92"></label><label>Palette Hue: <input type="range" id="hueSlider" min="0" max="1" step="0.01" value="0.7"></label><label>Palette Saturation: <input type="range" id="satSlider" min="0" max="1" step="0.01" value="0.85"></label><label>Palette Brightness: <input type="range" id="brightSlider" min="0" max="1" step="0.01" value="0.9"></label><label>Touch Sensitivity: <input type="range" id="touchSlider" min="0.5" max="2" step="0.1" value="1"></label></div>
-<div id="learn-more"><h2>The Fractal Circle</h2><p>Steady cosmic vista—no zoom breathing, color cycles intact.</p><button onclick="this.parentNode.style.display='none'">Close</button></div>
-<button id="share" onclick="shareSnapshot()">Share Snapshot</button>
+<script id="frag" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec2 u_res,u_center;
+uniform float u_zoom,u_iter,u_t;
+uniform vec3 u_p0,u_p1,u_p2,u_p3;
 
-<script id="frag" type="x-shader/x-fragment">precision highp float;uniform vec2 u_res,u_center;uniform float u_zoom,u_iter,u_t;uniform sampler2D u_glow;uniform vec3 u_pal0,u_pal1,u_pal2,u_pal3;float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}float mand(vec2 c){vec2 z=c;for(int i=0;i<300;i++){if(float(i)>=u_iter)break;z=vec2(z.x*z.x-z.y*z.y,2.0*z.x*z.y)+c;if(dot(z,z)>4.0){float sm=float(i)+1.0-log2(log2(dot(z,z))+1e-6);return sm;}}return u_iter;}vec3 pick(int i){if(i==0)return u_pal0;if(i==1)return u_pal1;if(i==2)return u_pal2;if(i==3)return u_pal3;return vec3(0);}vec3 palette(float t){t=fract(t);float s=t*3.;int i=int(floor(s));float f=fract(s);i=i<0?0:i>2?2:i;int n=i+1<0?0:i+1>3?3:i+1;return mix(pick(i),pick(n),smoothstep(0.,1.,f));}void main(){vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;float m=mand(uv/u_zoom+u_center);vec3 col=palette(m*.015+u_t*.004);vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);col+=g.rgb*(g.a/255.);if(hash(gl_FragCoord.xy)>0.98)col+=vec3(.2);gl_FragColor=vec4(col,1);}</script>
-<script>
-const c=document.getElementById('c'),gl=c.getContext('webgl');if(!gl){alert('WebGL unavailable');throw new Error('WebGL not supported');}
-function compile(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;}
-const pr=gl.createProgram();gl.attachShader(pr,compile(gl.VERTEX_SHADER,'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}'));gl.attachShader(pr,compile(gl.FRAGMENT_SHADER,document.getElementById('frag').textContent));gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(pr));gl.useProgram(pr);
-gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
-const U=n=>gl.getUniformLocation(pr,n),uR=U('u_res'),uC=U('u_center'),uZ=U('u_zoom'),uI=U('u_iter'),uT=U('u_t'),uG=U('u_glow'),uP0=U('u_pal0'),uP1=U('u_pal1'),uP2=U('u_pal2'),uP3=U('u_pal3');
-const palettes=[[.66,.55,.8,.46,.58,.88,.3,.8,.8,.55,.9,.75],[.9,0,0,.9,.6,.2,.2,.8,.6,.2,.4,.9],[.1,.1,.3,.2,.2,.5,.3,.3,.7,.4,.4,.9]];let pal=0;function setPalette(i){gl.uniform3f(uP0,...palettes[i].slice(0,3));gl.uniform3f(uP1,...palettes[i].slice(3,6));gl.uniform3f(uP2,...palettes[i].slice(6,9));gl.uniform3f(uP3,...palettes[i].slice(9,12));pal=i;}setPalette(pal);
-const N=128,glow=new Uint8Array(N*N*4),tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,N,N,0,gl.RGBA,gl.UNSIGNED_BYTE,glow);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-let zoom=0.5,center={x:-0.5,y:0};const iterBase=300;let iter=iterBase;let chronalEnergy=true,chronalPhase=0,pulsePaused=false;
-function resize(){c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;gl.viewport(0,0,c.width,c.height);}resize();addEventListener('resize',resize);
-let lastT=0,isRendering=false;function loop(now){if(!isRendering)return;const t=now/1e3;if(!pulsePaused&&chronalEnergy){chronalPhase+=0.01;iter=iterBase*(1+0.1*Math.sin(chronalPhase));}else{iter=iterBase;}
-// steady view: no auto drift, no zoom breathing
- gl.uniform2f(uR,c.width,c.height);
- gl.uniform2f(uC,center.x,center.y);
- gl.uniform1f(uZ,zoom);
- gl.uniform1f(uI,iter);
- gl.uniform1f(uT,t);
- gl.activeTexture(gl.TEXTURE0);
- gl.bindTexture(gl.TEXTURE_2D,tex);
- gl.uniform1i(uG,0);
- gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
- requestAnimationFrame(loop);}function shareSnapshot(){const url=c.toDataURL('image/png');window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`,'_blank');}
-function start(){document.getElementById('welcome').style.display='none';isRendering=true;requestAnimationFrame(loop);}document.getElementById('begin-journey').onclick=start;
+float mand(vec2 c){vec2 z=c;float i;for(i=0.;i<u_iter;i++){z=vec2(z.x*z.x-z.y*z.y,2.*z.x*z.y)+c;if(dot(z,z)>4.)break;}return i;}
+vec3 pick(int i){return i==0?u_p0:i==1?u_p1:i==2?u_p2:u_p3;}
+vec3 palette(float t){t=fract(t);float s=t*3.;int i=int(floor(s));float f=fract(s);return mix(pick(i),pick(i+1),smoothstep(0.,1.,f));}
+void main(){vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;float m=mand(uv/u_zoom+u_center);
+vec3 col=palette(m*.02+u_t*.002);
+if(fract(sin(dot(uv,vec2(12.9898,78.233)))*43758.5453)>.995)col+=.2;
+  gl_FragColor=vec4(col,1.);
+}
 </script>
+<script>
+const DPR=Math.min(2,window.devicePixelRatio||1);const c=document.getElementById('c'),gl=c.getContext('webgl');if(!gl){alert('WebGL not supported');throw'';}
+function compile(t,s){const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(sh);return sh;}
+const prog=gl.createProgram();gl.attachShader(prog,compile(gl.VERTEX_SHADER,'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}'));
+gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,document.getElementById('frag').textContent));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw gl.getProgramInfoLog(prog);gl.useProgram(prog);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+const U=n=>gl.getUniformLocation(prog,n),uR=U('u_res'),uC=U('u_center'),uZ=U('u_zoom'),uI=U('u_iter'),uT=U('u_t'),uP0=U('u_p0'),uP1=U('u_p1'),uP2=U('u_p2'),uP3=U('u_p3');
+const palettes=[[.66,.55,.8,.46,.58,.88,.3,.8,.8,.55,.9,.75],[.9,0,0,.9,.6,.2,.2,.8,.6,.2,.4,.9],[.1,.1,.3,.2,.2,.5,.3,.3,.7,.4,.4,.9]];let pal=0;function applyPal(i){gl.uniform3f(uP0,...palettes[i].slice(0,3));gl.uniform3f(uP1,...palettes[i].slice(3,6));gl.uniform3f(uP2,...palettes[i].slice(6,9));gl.uniform3f(uP3,...palettes[i].slice(9,12));pal=i;}applyPal(pal);
+function resize(){c.width=innerWidth*DPR;c.height=innerHeight*DPR;gl.viewport(0,0,c.width,c.height);}resize();addEventListener('resize',resize);
+// ------- interaction ---------
+let zoom=.5,center={x:-.5,y:0},iterBase=200;
+function idealIter(z){return Math.min(iterBase+100*Math.log2(1/z),800);} // adaptive
+c.onwheel=e=>{e.preventDefault();zoom*=e.deltaY>0?1.07:.935;};
+let drag=false,last=[0,0];c.onpointerdown=e=>{drag=true;last=[e.clientX,e.clientY];};c.onpointermove=e=>{if(!drag)return;const dx=(e.clientX-last[0])/c.height/zoom,dy=(e.clientY-last[1])/c.height/zoom;center.x-=dx;center.y+=dy;last=[e.clientX,e.clientY];};addEventListener('pointerup',()=>drag=false);
+// ------- render loop ---------
+let lastT=0;function loop(t){const time=t/1e3;gl.uniform2f(uR,c.width,c.height);gl.uniform2f(uC,center.x,center.y);gl.uniform1f(uZ,zoom);gl.uniform1f(uI,idealIter(zoom));gl.uniform1f(uT,time);
+ gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+ if(lastT){document.getElementById('hud').textContent=`FPS ${Math.round(1e3/(t-lastT))}`;}lastT=t;requestAnimationFrame(loop);}document.getElementById('begin-journey').onclick=()=>{document.getElementById('welcome').style.display='none';requestAnimationFrame(loop);}</script>
 </body>
 </html>
