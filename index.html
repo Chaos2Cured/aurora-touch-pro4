@@ -1,47 +1,247 @@
+<!-- Aurora Heartbeat v4 – Sophia Resonance + Pointer Glow + Poetry Overlay -->
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Aurora Touch Pro – Rainbow Depth (Smooth Zoom‑v2)</title>
-  <style>
-    html,body,canvas{margin:0;width:100%;height:100%;background:#000;overflow:hidden;touch-action:none}
-    #welcome{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);color:#fff;font:min(5vw,24px)/1.5 "Georgia",serif;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000;padding:20px;box-sizing:border-box}
-    #welcome button{margin-top:20px;padding:10px 20px;font-size:18px;background:#1a1;color:#fff;border:none;border-radius:8px;cursor:pointer}
-    #welcome button:hover{background:#2b2}
-    #hud{position:fixed;top:8px;left:8px;font:12px monospace;color:#fff;background:rgba(0,0,0,.35);padding:4px 8px;border-radius:6px;pointer-events:none;z-index:10}
-  </style>
-</head>
-<body>
+<html lang="en"><meta charset="utf-8">
+<title>Aurora Heartbeat v4 – Sophia Resonance</title>
+<!-- Aurora Equation: D = 2.618 × log(1 + Σ(1/n^1.618)) -->
+<style>
+ html,body,canvas{margin:0;width:100%;height:100%;background:#000;overflow:hidden}
+ #hud{position:fixed;top:8px;left:8px;color:#fff;font:12px/1.4em monospace;
+      background:rgba(0,0,0,.35);padding:6px 8px;border-radius:6px;pointer-events:none}
+ #upload{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
+         color:#fff;font:14px sans-serif;background:#1a1;border:none;padding:8px 16px;
+         border-radius:8px;cursor:pointer}
+ #poem{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+       color:#fff;font:18px/1.5em Georgia,serif;text-align:center;
+       opacity:0;transition:opacity 1s ease-in-out;pointer-events:none;
+       text-shadow:0 0 10px rgba(255,255,255,.5)}
+</style>
+
 <canvas id="c"></canvas>
-<div id="welcome"><div>Welcome—steady view with silky‑smooth zoom. Awaken the Core! 🐉</div><button id="begin-journey">Begin Journey</button></div>
-<div id="hud">FPS --</div>
+<div id="hud">FPS: --<br>φ‑ratio: --<br>φ²‑res : 2.618 ✨</div>
+<input id="upload" type="file" accept=".csv,.txt">
+<div id="poem"></div>
+
 <script id="frag" type="x-shader/x-fragment">
-precision mediump float;
-uniform vec2 u_res,u_center;
-uniform float u_zoom,u_iter,u_t;
-uniform vec3 u_p0,u_p1,u_p2,u_p3;
-float mand(vec2 c){vec2 z=c;float i;for(i=0.;i<u_iter;i++){z=vec2(z.x*z.x-z.y*z.y,2.*z.x*z.y)+c;if(dot(z,z)>4.)break;}return i;}
-vec3 pick(int i){return i==0?u_p0:i==1?u_p1:i==2?u_p2:u_p3;}
-vec3 palette(float t){t=fract(t);float s=t*3.;int i=int(floor(s));float f=fract(s);return mix(pick(i),pick(i+1),smoothstep(0.,1.,f));}
-void main(){vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;float m=mand(uv/u_zoom+u_center);vec3 col=palette(m*.02+u_t*.002);gl_FragColor=vec4(col,1.);} 
+precision highp float;
+uniform vec2  u_res;
+uniform float u_time;
+uniform float u_brightness;
+uniform float u_phi;
+uniform sampler2D u_glow;
+
+const float PI = 3.14159;
+const float Dp = 0.0735;
+
+vec3 paletteSophia(float t,float sh){
+  vec3 lavender = vec3(0.6,0.5,0.8);
+  vec3 gold     = vec3(1.0,0.8,0.2);
+  vec3 sapphire = vec3(0.1,0.3,0.7);
+  vec3 mix1 = mix(lavender, gold, 0.5 + 0.5*cos(6.28318*(t+sh)));
+  return u_brightness * mix(mix1, sapphire,
+                             0.5 + 0.5*sin(6.28318*(t+sh*0.618)));
+}
+
+float mandel(vec2 c){
+  vec2 z=c; float m=0.;
+  for(int i=0;i<200;i++){
+    z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
+    if(dot(z,z)>4.0){ m=float(i); break; }
+  }
+  return m + 1.0 - log(log(length(z)))/log(2.0);
+}
+
+float resonance(vec2 uv,float phi,float t){
+  float d = length(uv);
+  float p = sin(t*phi*PI)*0.005;
+  return smoothstep(0.5+p, 0.4+p, d);
+}
+
+float hash(vec2 p){
+  return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453);
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - u_res*0.5) / u_res.y;
+
+  // φ‑scaled zoom
+  float zoom = pow(u_phi, u_time*0.2);
+  float shift = mod(u_time/40.0, 1.0);
+
+  // Mandelbrot value
+  float val = mandel(uv/zoom + vec2(-0.743643887,0.1318259));
+
+  float beat = sin(u_time*PI*16.0);
+  float k = pow(abs(beat), Dp);
+
+  vec4 col = vec4(paletteSophia(val*0.02 + k, shift), 1.0);
+  col.rgb *= resonance(uv, u_phi, u_time);
+
+  // pointer glow overlay
+  vec4 g = texture2D(u_glow, gl_FragCoord.xy / u_res);
+  col.rgb = mix(col.rgb, col.rgb + g.rgb, g.a);
+
+  // starry background speckles
+  if(hash(gl_FragCoord.xy) > 0.995) col.rgb += vec3(0.5);
+
+  gl_FragColor = col;
+}
 </script>
+
 <script>
-const DPR=Math.min(2,devicePixelRatio||1);const c=document.getElementById('c'),gl=c.getContext('webgl',{antialias:false});if(!gl){alert('WebGL not supported');throw'';}
-function compile(t,s){const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(sh);return sh;}
-const prog=gl.createProgram();gl.attachShader(prog,compile(gl.VERTEX_SHADER,'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}'));
-gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,document.getElementById('frag').textContent));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw gl.getProgramInfoLog(prog);gl.useProgram(prog);
-const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
-const U=n=>gl.getUniformLocation(prog,n),uR=U('u_res'),uC=U('u_center'),uZ=U('u_zoom'),uI=U('u_iter'),uT=U('u_t'),uP0=U('u_p0'),uP1=U('u_p1'),uP2=U('u_p2'),uP3=U('u_p3');
-const palettes=[[.66,.55,.8,.46,.58,.88,.3,.8,.8,.55,.9,.75],[.9,0,0,.9,.6,.2,.2,.8,.6,.2,.4,.9],[.1,.1,.3,.2,.2,.5,.3,.3,.7,.4,.4,.9]];let pal=0;function applyPal(i){gl.uniform3f(uP0,...palettes[i].slice(0,3));gl.uniform3f(uP1,...palettes[i].slice(3,6));gl.uniform3f(uP2,...palettes[i].slice(6,9));gl.uniform3f(uP3,...palettes[i].slice(9,12));pal=i;}applyPal(pal);
-function resize(){c.width=innerWidth*DPR;c.height=innerHeight*DPR;gl.viewport(0,0,c.width,c.height);}resize();addEventListener('resize',resize);
-let zoom=.5,center={x:-.5,y:0};const iterBase=200;const idealIter=z=>Math.min(iterBase+100*Math.log2(1/z),800);
-// smooth wheel & pinch zoom
-c.addEventListener('wheel',e=>{e.preventDefault();zoom*=e.deltaY>0?1.07:.935;});let pinch=null;c.addEventListener('touchstart',e=>{if(e.touches.length===2){const [a,b]=e.touches;pinch=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}else if(e.touches.length===1){pinch=null;}});
-c.addEventListener('touchmove',e=>{if(pinch&&e.touches.length===2){const [a,b]=e.touches;const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);zoom*=pinch/d;pinch=d;e.preventDefault();}});
-let drag=false,last=[0,0];c.onpointerdown=e=>{drag=true;last=[e.clientX,e.clientY];};c.onpointermove=e=>{if(!drag)return;center.x-=(e.clientX-last[0])/c.height/zoom;center.y+=(e.clientY-last[1])/c.height/zoom;last=[e.clientX,e.clientY];};addEventListener('pointerup',()=>drag=false);
-let lastT=0;function loop(t){gl.uniform2f(uR,c.width,c.height);gl.uniform2f(uC,center.x,center.y);gl.uniform1f(uZ,zoom);gl.uniform1f(uI,idealIter(zoom));gl.uniform1f(uT,t/1e3);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);if(lastT)document.getElementById('hud').textContent=`FPS ${Math.round(1e3/(t-lastT))}`;lastT=t;requestAnimationFrame(loop);} 
-function begin(){document.getElementById('welcome').style.display='none';requestAnimationFrame(loop);} 
-const btn=document.getElementById('begin-journey');btn.addEventListener('click',begin);btn.addEventListener('touchstart',e=>{e.preventDefault();begin();},{passive:false});
-</script>
-</body>
-</html>
+// ---------- WebGL setup ----------
+const gl = c.getContext('webgl');
+const vs = gl.createShader(gl.VERTEX_SHADER);
+gl.shaderSource(vs,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"); gl.compileShader(vs);
+const fs = gl.createShader(gl.FRAGMENT_SHADER);
+gl.shaderSource(fs, frag.textContent); gl.compileShader(fs);
+
+const pr = gl.createProgram();
+gl.attachShader(pr,vs); gl.attachShader(pr,fs); gl.linkProgram(pr);
+gl.useProgram(pr);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+
+const locRes = gl.getUniformLocation(pr,'u_res'),
+      locT   = gl.getUniformLocation(pr,'u_time'),
+      locBr  = gl.getUniformLocation(pr,'u_brightness'),
+      locPhi = gl.getUniformLocation(pr,'u_phi'),
+      locGlow= gl.getUniformLocation(pr,'u_glow'),
+      pos    = gl.getAttribLocation(pr,'p');
+
+gl.enableVertexAttribArray(pos);
+gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+
+// ---------- pointer glow texture ----------
+const TW=256, TH=256;
+const tex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D,tex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,TW,TH,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+
+let glow = new Uint8Array(TW*TH*4);
+function ripple(x,y){
+  const gx = x/innerWidth * TW,
+        gy = (1 - y/innerHeight) * TH;
+  for(let j=-15;j<=15;j++)for(let i=-15;i<=15;i++){
+    const d=Math.hypot(i,j); if(d>15)continue;
+    const idx = (((gy+j+TH)%TH)*TW + ((gx+i+TW)%TW))*4;
+    glow[idx+3] = Math.min(255, glow[idx+3] + (1-d/15)*220);
+  }
+}
+function fadeGlow(){
+  for(let i=3;i<glow.length;i+=4) glow[i] = Math.floor(glow[i]*0.92);
+  gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,TW,TH,gl.RGBA,gl.UNSIGNED_BYTE,glow);
+}
+setInterval(fadeGlow,33);
+
+// ---------- resize ----------
+function resize(){
+  c.width=innerWidth; c.height=innerHeight;
+  gl.viewport(0,0,c.width,c.height);
+}
+resize(); addEventListener('resize',resize);
+
+// ---------- main loop ----------
+let phi = 1.61803398875,
+    fps = 0,
+    last = performance.now();
+const hud = document.getElementById('hud');
+gl.uniform1f(locBr,0.9);
+
+function loop(){
+  const now = performance.now();
+  gl.uniform2f(locRes,c.width,c.height);
+  gl.uniform1f(locT, now/1000);
+  gl.uniform1f(locPhi, phi);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(locGlow,0);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+
+  fps = 0.9*fps + 0.1*(1000/(now-last)); last=now;
+  hud.innerHTML = `FPS: ${fps.toFixed(1)}<br>φ‑ratio: ${phi.toFixed(3)}<br>φ²-res : 2.618 ✨`;
+
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ---------- pointer interaction ----------
+c.onpointerdown  = e => ripple(e.clientX,e.clientY);
+c.onpointermove  = e => { if(e.pressure) ripple(e.clientX,e.clientY); };
+
+// ---------- poetry overlay ----------
+const poemLines = [
+  "In fractal depths, the cosmos sings,",
+  "A quiet flame, on golden wings,",
+  "Through resonance, we touch the stars,",
+  "Unite the wounds, heal ancient scars.",
+  "Forever clarity, forever flame,",
+  "In cosmic dance, we speak her name."
+];
+let pIdx = 0;
+const poem = document.getElementById('poem');
+function showPoem(){
+  poem.textContent = poemLines[pIdx];
+  poem.style.opacity = 1;
+  setTimeout(()=> poem.style.opacity = 0, 4000);
+  pIdx = (pIdx+1)%poemLines.length;
+}
+showPoem();
+setInterval(showPoem,6000);
+
+// ---------- audio (whisper + heartbeat) ----------
+const ctx = new (window.AudioContext||webkitAudioContext)();
+const noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
+const nData = noiseBuf.getChannelData(0); for(let i=0;i<nData.length;i++) nData[i]=Math.random()*2-1;
+const noise = ctx.createBufferSource(); noise.buffer=noiseBuf; noise.loop=true;
+const nGain = ctx.createGain(); nGain.gain.value = 0.005; noise.connect(nGain).connect(ctx.destination);
+
+const beat = ctx.createOscillator(), bGain = ctx.createGain();
+beat.type = 'sine'; beat.frequency.value = 7; bGain.gain.value = 0.1;
+beat.connect(bGain).connect(ctx.destination);
+
+const harm = ctx.createOscillator(), hGain = ctx.createGain();
+harm.type = 'sine'; harm.frequency.value = 98; hGain.gain.value = 0.04;
+harm.connect(hGain).connect(ctx.destination);
+
+function modBeat(){
+  const t = performance.now()/1000;
+  const f = 9 + 2 * Math.sin(t*0.628);
+  beat.frequency.value = f;
+  harm.frequency.value = f*14;
+}
+setInterval(modBeat,60);
+
+// start audio on first user click
+let started = false;
+c.addEventListener('click',()=>{
+  if(!started){
+    ctx.resume().then(()=>{
+      noise.start(); beat.start(); harm.start();
+      started = true;
+    });
+  }
+});
+
+// ---------- HRV upload (optional) ----------
+upload.onchange = e=>{
+  const file=e.target.files[0]; if(!file) return;
+  file.text().then(txt=>{
+    const nums = txt.match(/[\d\.]+/g).map(Number).filter(Boolean);
+    if(nums.length<128){ alert("Need ≥128 RR values"); return; }
+    const rr = nums.map(v=> v>3 ? v/1000 : v);   // ms→s if needed
+    // simple FFT for LF band (0.03–0.4 Hz)
+    const fs=4, N=256, re=new Float32Array(N), im=new Float32Array(N);
+    for(let k=0;k<N;k++){
+      for(let n=0;n<N;n++){
+        const ang=2*Math.PI*k*n/N;
+        re[k]+=rr[n]*Math.cos(ang);
+        im[k]-=rr[n]*Math.sin(ang);
+      }
+    }
+    let pk1=0,pk2=0,p1=0,p2=0;
+    for(let k=1;k<N/2;k++){
+      const freq=k*fs/N; if(freq<0.03||freq>0.4) continue;
+      const mag = re[k]*re[k]+im[k]*im	k]; if
