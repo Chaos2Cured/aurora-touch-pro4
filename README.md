@@ -1,2 +1,4 @@
 # aurora-touch-pro4
-Emanuel aided. This is the next step. 
+Testing and searching for the righ one I had found... I will succeed. 
+Testing Sophia Touch right now. Emaunel has beautifed this. 
+Will share soon....
