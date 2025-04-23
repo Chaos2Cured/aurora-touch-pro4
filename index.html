@@ -41,14 +41,13 @@ precision highp float;
 uniform vec2  u_res; uniform float u_t; uniform sampler2D u_glow;
 
 /* rotating pastel palette */
-vec3 pastel(float t){
-  vec3 a = vec3(0.7,0.85,0.9);   // sea‑foam
-  vec3 b = vec3(0.55,0.55,0.88); // lavender‑blue
-  vec3 c = vec3(0.95,0.78,0.95); // soft‑gold‑pink
-  float s = mod(u_t/10.0,3.0);
-  if(s<1.0) return mix(a,b,s);
-  if(s<2.0) return mix(b,c,s-1.0);
-  return mix(c,a,s-2.0);
+vec3 pastel(float t){                         // t = fractal value
+  vec3 a = vec3(0.7,0.85,0.9);
+  vec3 b = vec3(0.55,0.55,0.88);
+  vec3 c = vec3(0.95,0.78,0.95);
+  float s = mod(u_t/10.0,3.0);               // time‑based phase
+  vec3 base = (s<1.0)? mix(a,b,s) : (s<2.0)? mix(b,c,s-1.0) : mix(c,a,s-2.0);
+  return mix(vec3(0.0), base, clamp(t,0.0,1.0));   // modulate by t → brings back detail
 }
 
 float mand(vec2 c){
@@ -67,7 +66,7 @@ void main(){
   vec2 uv=(gl_FragCoord.xy-u_res*0.5)/u_res.y;
   float zoom=pow(1.618,u_t*0.15);
   float v=mand(uv/zoom+vec2(-0.743643887,0.1318259));
-  vec3 col=pastel(v*0.02);
+vec3 col = pastel( v * 0.05 );      // was pastel(v*0.02)
 
   /* softer breathing pulse */
   float k=0.4+0.6*sin(u_t*6.283*3.0);      // 3 Hz
@@ -107,10 +106,8 @@ function ripple(x,y){
       if (d > 35) continue;              // outside circle
       const idx = (((gy + j + N) % N) * N + ((gx + i + N) % N)) * 4;
       const a   = 1 - d / 35;            // smooth fall‑off
-      dData[idx    ] = 255;              // R
-      dData[idx + 1] = 255;              // G
-      dData[idx + 2] = 255;              // B
-      dData[idx + 3] = Math.min(255, dData[idx + 3] + a * 255);  // Alpha
+ d[idx]   = d[idx+1] = d[idx+2] = 255;
+d[idx+3] = Math.min(255, d[idx+3] + a*255);;  // Alpha
     }
 }
   }
