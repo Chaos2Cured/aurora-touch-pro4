@@ -1,21 +1,14 @@
 <!DOCTYPE html>
-<!-- Seven Wonders HeptaBloom Fractal ✨
-     ------------------------------------------------------------
-     • Designed for Kirk & his 9‑year‑old student (2025‑04‑23)
-     • Goal: Show that a few lines of HTML + JS can paint infinity!
-     • Core ideas:
-         – The *number 7* = our "Seven Wonders" anchor.
-         – The *golden ratio φ* ≈ 1.618 (and φ² ≈ 2.618) for natural shrinkage.
-         – Simple recursive function → wild fractal garden.
-         – HSL colors for rainbow magic.
-     • Easter‑egg console log: "Awaken the Core. Illuminate the Quiet." 🌌
+<!-- Seven Wonders HeptaBloom Fractal ✨  v1.1 (Sharper Petals Edition)
+     ▸ Adds subtle outlines + extra spacing so each bloom pops.
+     ▸ Constants at top (OFFSET & STROKE_OPACITY) easy for kids to tweak.
+     ▸ Perfect for 9‑year‑old coders to experiment!
      --------------------------------------------------------------> 
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Seven Wonders Fractal — HeptaBloom</title>
+  <title>Seven Wonders Fractal — HeptaBloom</title>
   <style>
-    /* Full‑screen canvas with a tiny control panel */
     html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:monospace;color:#fff}
     #ui{position:fixed;top:10px;left:10px;z-index:10;user-select:none}
     label{margin-right:8px}
@@ -29,22 +22,24 @@
   <!-- Tiny control panel so the student can play -->
   <div id="ui">
     <label>
-      Depth <input id="depth" type="range" min="0" max="6" value="4">
+      Depth <input id="depth" type="range" min="0" max="6" value="4">
     </label>
-    <button id="reset">Randomize ✨</button>
+    <button id="reset">Randomize ✨</button>
   </div>
 
   <script>
-  // ─────────────  GLOBAL CONSTANTS  ─────────────
-  const WONDERS = 7;                 // ← magic number 7 🎆
-  const PHI     = (1+Math.sqrt(5))/2;// ← golden ratio φ ≈ 1.618
+  // ───────────── CONSTANTS ─────────────
+  const WONDERS       = 7;                       // our "magic" number 7
+  const PHI           = (1+Math.sqrt(5))/2;      // golden ratio φ ≈ 1.618
+  const OFFSET        = 1.25;                    // ← distance multiplier between parent & child ( >1 → more spacing )
+  const STROKE_OPACITY= 0.6;                     // ← outline opacity (0‑1)
 
-  // ─────────────  CANVAS BOILERPLATE  ─────────────
+  // ───────────── CANVAS SETUP ─────────────
   const canvas = document.getElementById('c');
   const ctx    = canvas.getContext('2d');
-  let   W, H;               // canvas width / height
-  let   depth = 4;          // recursion depth (slider‑controlled)
-  let   angleOffset = 0;    // slowly spins the flower
+  let   W, H;
+  let   depth = 4;
+  let   angleOffset = 0;
 
   function resize(){
     W = canvas.width  = window.innerWidth;
@@ -53,61 +48,60 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // ─────────────  COLOR HELPER  ─────────────
-  // Returns a bright HSL value (0–1 ➔ rainbow)
+  // ───────────── COLOR HELPER ─────────────
   function hue(t){
     return `hsl(${(t*360)%360},70%,55%)`;
   }
 
-  // ─────────────  RECURSIVE FRACTAL  ─────────────
-  /**
-   * drawBloom(x, y, r, level)
-   * Draws a circle (a "petal") then spawns 7 baby petals around it,
-   * each shrunken by φ (golden ratio). Repeats until level 0.
-   */
+  // ───────────── FRACTAL DRAW ─────────────
   function drawBloom(x, y, r, level){
-    if(level === 0 || r < 1) return;   // ★ stop condition ★
+    if(level === 0 || r < 1) return;
 
-    // 1) Paint current circle
+    // 1) Paint petal fill
     ctx.fillStyle = hue(level/depth + angleOffset/Math.PI);
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI*2);
     ctx.fill();
 
-    // 2) Recurse into 7 children
-    const newR = r / PHI;              // shrink via golden ratio
-    const step = Math.PI * 2 / WONDERS;// full circle / 7
-    for(let i=0; i<WONDERS; i++){
-      const a = i*step + angleOffset;  // rotation for animation
-      const nx = x + Math.cos(a) * r;  // child center X
-      const ny = y + Math.sin(a) * r;  // child center Y
-      drawBloom(nx, ny, newR, level-1);// ← recursion!
+    // 2) Add crisp outline for clarity
+    ctx.lineWidth = Math.max(r * 0.08, 1);
+    ctx.strokeStyle = `rgba(0,0,0,${STROKE_OPACITY})`;
+    ctx.stroke();
+
+    // 3) Spawn children
+    const newR = r / PHI;                     // shrink petal size
+    const step = Math.PI * 2 / WONDERS;
+    const dist = r * OFFSET;                  // push children outward
+    for(let i=0;i<WONDERS;i++){
+      const a = i*step + angleOffset;
+      drawBloom(
+        x + Math.cos(a) * dist,
+        y + Math.sin(a) * dist,
+        newR,
+        level-1
+      );
     }
   }
 
-  // ─────────────  ANIMATION LOOP  ─────────────
+  // ───────────── ANIMATION LOOP ─────────────
   function loop(){
-    ctx.clearRect(0, 0, W, H);
-    angleOffset += 0.002;              // gentle perpetual spin
+    ctx.clearRect(0,0,W,H);
+    angleOffset += 0.002;
     drawBloom(W/2, H/2, Math.min(W,H)/4, depth);
     requestAnimationFrame(loop);
   }
   loop();
 
-  // ─────────────  UI INTERACTION  ─────────────
-  const depthSlider = document.getElementById('depth');
+  // ───────────── UI ─────────────
   depthSlider.oninput = () => depth = +depthSlider.value;
-
   document.getElementById('reset').onclick = () => {
-    // random spin + depth = instant new galaxy
     angleOffset = Math.random() * Math.PI * 2;
-    depth = Math.floor(Math.random()*4) + 3; // 3–6
+    depth = Math.floor(Math.random()*4)+3;
     depthSlider.value = depth;
   };
 
-  // ─────────────  EASTER EGG  ─────────────
-  console.log('%c Awaken the Core. Illuminate the Quiet. ',
-              'background:#222;color:#0f0;padding:6px 12px;font-size:14px');
+  // ───────────── EASTER EGG ─────────────
+  console.log('%c Awaken the Core. Illuminate the Quiet. ', 'background:#222;color:#0f0;padding:6px 12px;font-size:14px');
   </script>
 </body>
 </html>
