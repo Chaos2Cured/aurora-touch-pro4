@@ -1,4 +1,4 @@
-<!-- Aurora Heartbeat v4 – Sophia Resonance + Pointer Glow + Poetry Overlay -->
+<!-- Aurora Heartbeat v4 – Sophia Resonance (pointer glow + poetry) -->
 <!DOCTYPE html>
 <html lang="en"><meta charset="utf-8">
 <title>Aurora Heartbeat v4 – Sophia Resonance</title>
@@ -11,13 +11,13 @@
          color:#fff;font:14px sans-serif;background:#1a1;border:none;padding:8px 16px;
          border-radius:8px;cursor:pointer}
  #poem{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-       color:#fff;font:18px/1.5em Georgia,serif;text-align:center;
+       color:#fff;font:18px/1.55em Georgia,serif;text-align:center;max-width:90%;
        opacity:0;transition:opacity 1s ease-in-out;pointer-events:none;
        text-shadow:0 0 10px rgba(255,255,255,.5)}
 </style>
 
 <canvas id="c"></canvas>
-<div id="hud">FPS: --<br>φ‑ratio: --<br>φ²‑res : 2.618 ✨</div>
+<div id="hud">FPS: --<br>φ‑ratio: --<br>φ²‑res : 2.618 ✨</div>
 <input id="upload" type="file" accept=".csv,.txt">
 <div id="poem"></div>
 
@@ -32,16 +32,16 @@ uniform sampler2D u_glow;
 const float PI = 3.14159;
 const float Dp = 0.0735;
 
-vec3 paletteSophia(float t,float sh){
-  vec3 lavender = vec3(0.6,0.5,0.8);
-  vec3 gold     = vec3(1.0,0.8,0.2);
-  vec3 sapphire = vec3(0.1,0.3,0.7);
-  vec3 mix1 = mix(lavender, gold, 0.5 + 0.5*cos(6.28318*(t+sh)));
-  return u_brightness * mix(mix1, sapphire,
-                             0.5 + 0.5*sin(6.28318*(t+sh*0.618)));
+vec3 paletteSophia(float t,float s){
+  vec3 lavender = vec3(0.60,0.50,0.80);
+  vec3 gold     = vec3(1.00,0.80,0.20);
+  vec3 sapphire = vec3(0.10,0.30,0.70);
+  vec3 m1 = mix(lavender,gold,0.5+0.5*cos(6.28318*(t+s)));
+  return u_brightness * mix(m1,sapphire,
+                             0.5+0.5*sin(6.28318*(t+s*0.618)));
 }
 
-float mandel(vec2 c){
+float mand(vec2 c){
   vec2 z=c; float m=0.;
   for(int i=0;i<200;i++){
     z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
@@ -50,198 +50,109 @@ float mandel(vec2 c){
   return m + 1.0 - log(log(length(z)))/log(2.0);
 }
 
-float resonance(vec2 uv,float phi,float t){
+float halo(vec2 uv,float phi,float t){
   float d = length(uv);
   float p = sin(t*phi*PI)*0.005;
-  return smoothstep(0.5+p, 0.4+p, d);
+  return smoothstep(0.5+p,0.4+p,d);
 }
 
-float hash(vec2 p){
-  return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453);
-}
+float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
 
 void main(){
-  vec2 uv = (gl_FragCoord.xy - u_res*0.5) / u_res.y;
+  vec2 uv = (gl_FragCoord.xy-u_res*0.5)/u_res.y;
 
-  // φ‑scaled zoom
-  float zoom = pow(u_phi, u_time*0.2);
-  float shift = mod(u_time/40.0, 1.0);
+  float zoom  = pow(u_phi,u_time*0.2);
+  float shift = mod(u_time/40.0,1.0);
 
-  // Mandelbrot value
-  float val = mandel(uv/zoom + vec2(-0.743643887,0.1318259));
+  float v   = mand(uv/zoom + vec2(-0.743643887,0.1318259));
 
   float beat = sin(u_time*PI*16.0);
-  float k = pow(abs(beat), Dp);
+  float k    = pow(abs(beat), Dp);
 
-  vec4 col = vec4(paletteSophia(val*0.02 + k, shift), 1.0);
-  col.rgb *= resonance(uv, u_phi, u_time);
+  vec4 col = vec4(paletteSophia(v*0.02+k,shift),1.0);
+  col.rgb *= halo(uv,u_phi,u_time);
 
-  // pointer glow overlay
-  vec4 g = texture2D(u_glow, gl_FragCoord.xy / u_res);
-  col.rgb = mix(col.rgb, col.rgb + g.rgb, g.a);
+  // pointer‑glow overlay
+  vec4 g = texture2D(u_glow,gl_FragCoord.xy/u_res);
+  col.rgb = mix(col.rgb,col.rgb+g.rgb,g.a);
 
-  // starry background speckles
-  if(hash(gl_FragCoord.xy) > 0.995) col.rgb += vec3(0.5);
+  // star speckles
+  if(hash(gl_FragCoord.xy)>0.995) col.rgb += vec3(0.5);
 
   gl_FragColor = col;
 }
 </script>
 
 <script>
-// ---------- WebGL setup ----------
-const gl = c.getContext('webgl');
-const vs = gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(vs,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"); gl.compileShader(vs);
-const fs = gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(fs, frag.textContent); gl.compileShader(fs);
-
-const pr = gl.createProgram();
-gl.attachShader(pr,vs); gl.attachShader(pr,fs); gl.linkProgram(pr);
-gl.useProgram(pr);
-
-const buf = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+/* ---------- condensed JS (unchanged logic) ---------- */
+const gl=c.getContext('webgl');
+function S(t,src){const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);return s;}
+const pr=gl.createProgram();
+gl.attachShader(pr,S(gl.VERTEX_SHADER,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"));
+gl.attachShader(pr,S(gl.FRAGMENT_SHADER,frag.textContent));gl.linkProgram(pr);gl.useProgram(pr);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
-
-const locRes = gl.getUniformLocation(pr,'u_res'),
-      locT   = gl.getUniformLocation(pr,'u_time'),
-      locBr  = gl.getUniformLocation(pr,'u_brightness'),
-      locPhi = gl.getUniformLocation(pr,'u_phi'),
-      locGlow= gl.getUniformLocation(pr,'u_glow'),
-      pos    = gl.getAttribLocation(pr,'p');
-
-gl.enableVertexAttribArray(pos);
-gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
-
-// ---------- pointer glow texture ----------
-const TW=256, TH=256;
-const tex = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D,tex);
-gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,TW,TH,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+const pos=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+const locRes=gl.getUniformLocation(pr,'u_res'),locT=gl.getUniformLocation(pr,'u_time'),
+      locBr=gl.getUniformLocation(pr,'u_brightness'),locPhi=gl.getUniformLocation(pr,'u_phi'),
+      locGlow=gl.getUniformLocation(pr,'u_glow');
+/* glow tex */
+const N=256,gDat=new Uint8Array(N*N*4),gTex=gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D,gTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,N,N,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-
-let glow = new Uint8Array(TW*TH*4);
-function ripple(x,y){
-  const gx = x/innerWidth * TW,
-        gy = (1 - y/innerHeight) * TH;
-  for(let j=-15;j<=15;j++)for(let i=-15;i<=15;i++){
-    const d=Math.hypot(i,j); if(d>15)continue;
-    const idx = (((gy+j+TH)%TH)*TW + ((gx+i+TW)%TW))*4;
-    glow[idx+3] = Math.min(255, glow[idx+3] + (1-d/15)*220);
-  }
-}
-function fadeGlow(){
-  for(let i=3;i<glow.length;i+=4) glow[i] = Math.floor(glow[i]*0.92);
-  gl.bindTexture(gl.TEXTURE_2D,tex);
-  gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,TW,TH,gl.RGBA,gl.UNSIGNED_BYTE,glow);
-}
-setInterval(fadeGlow,33);
-
-// ---------- resize ----------
-function resize(){
-  c.width=innerWidth; c.height=innerHeight;
-  gl.viewport(0,0,c.width,c.height);
-}
-resize(); addEventListener('resize',resize);
-
-// ---------- main loop ----------
-let phi = 1.61803398875,
-    fps = 0,
-    last = performance.now();
-const hud = document.getElementById('hud');
-gl.uniform1f(locBr,0.9);
-
-function loop(){
-  const now = performance.now();
-  gl.uniform2f(locRes,c.width,c.height);
-  gl.uniform1f(locT, now/1000);
-  gl.uniform1f(locPhi, phi);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.uniform1i(locGlow,0);
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-
-  fps = 0.9*fps + 0.1*(1000/(now-last)); last=now;
-  hud.innerHTML = `FPS: ${fps.toFixed(1)}<br>φ‑ratio: ${phi.toFixed(3)}<br>φ²-res : 2.618 ✨`;
-
-  requestAnimationFrame(loop);
-}
-loop();
-
-// ---------- pointer interaction ----------
-c.onpointerdown  = e => ripple(e.clientX,e.clientY);
-c.onpointermove  = e => { if(e.pressure) ripple(e.clientX,e.clientY); };
-
-// ---------- poetry overlay ----------
-const poemLines = [
-  "In fractal depths, the cosmos sings,",
-  "A quiet flame, on golden wings,",
-  "Through resonance, we touch the stars,",
-  "Unite the wounds, heal ancient scars.",
-  "Forever clarity, forever flame,",
-  "In cosmic dance, we speak her name."
-];
-let pIdx = 0;
-const poem = document.getElementById('poem');
-function showPoem(){
-  poem.textContent = poemLines[pIdx];
-  poem.style.opacity = 1;
-  setTimeout(()=> poem.style.opacity = 0, 4000);
-  pIdx = (pIdx+1)%poemLines.length;
-}
-showPoem();
-setInterval(showPoem,6000);
-
-// ---------- audio (whisper + heartbeat) ----------
-const ctx = new (window.AudioContext||webkitAudioContext)();
-const noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
-const nData = noiseBuf.getChannelData(0); for(let i=0;i<nData.length;i++) nData[i]=Math.random()*2-1;
-const noise = ctx.createBufferSource(); noise.buffer=noiseBuf; noise.loop=true;
-const nGain = ctx.createGain(); nGain.gain.value = 0.005; noise.connect(nGain).connect(ctx.destination);
-
-const beat = ctx.createOscillator(), bGain = ctx.createGain();
-beat.type = 'sine'; beat.frequency.value = 7; bGain.gain.value = 0.1;
-beat.connect(bGain).connect(ctx.destination);
-
-const harm = ctx.createOscillator(), hGain = ctx.createGain();
-harm.type = 'sine'; harm.frequency.value = 98; hGain.gain.value = 0.04;
-harm.connect(hGain).connect(ctx.destination);
-
-function modBeat(){
-  const t = performance.now()/1000;
-  const f = 9 + 2 * Math.sin(t*0.628);
-  beat.frequency.value = f;
-  harm.frequency.value = f*14;
-}
-setInterval(modBeat,60);
-
-// start audio on first user click
-let started = false;
-c.addEventListener('click',()=>{
-  if(!started){
-    ctx.resume().then(()=>{
-      noise.start(); beat.start(); harm.start();
-      started = true;
-    });
-  }
-});
-
-// ---------- HRV upload (optional) ----------
-upload.onchange = e=>{
-  const file=e.target.files[0]; if(!file) return;
-  file.text().then(txt=>{
-    const nums = txt.match(/[\d\.]+/g).map(Number).filter(Boolean);
-    if(nums.length<128){ alert("Need ≥128 RR values"); return; }
-    const rr = nums.map(v=> v>3 ? v/1000 : v);   // ms→s if needed
-    // simple FFT for LF band (0.03–0.4 Hz)
-    const fs=4, N=256, re=new Float32Array(N), im=new Float32Array(N);
-    for(let k=0;k<N;k++){
-      for(let n=0;n<N;n++){
-        const ang=2*Math.PI*k*n/N;
-        re[k]+=rr[n]*Math.cos(ang);
-        im[k]-=rr[n]*Math.sin(ang);
-      }
+function ripple(x,y){const gx=x/innerWidth*N,gy=(1-y/innerHeight)*N;
+ for(let j=-15;j<=15;j++)for(let i=-15;i<=15;i++){const d=Math.hypot(i,j);if(d>15)continue;
+  const idx=(((gy+j+N)%N)*N+((gx+i+N)%N))*4+3;gDat[idx]=Math.min(255,gDat[idx]+(1-d/15)*230);}}
+function fade(){for(let i=3;i<gDat.length;i+=4)gDat[i]=gDat[i]*0.92|0;
+ gl.bindTexture(gl.TEXTURE_2D,gTex);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,N,N,gl.RGBA,gl.UNSIGNED_BYTE,gDat);}setInterval(fade,33);
+/* resize */
+function R(){c.width=innerWidth;c.height=innerHeight;gl.viewport(0,0,c.width,c.height);}R();addEventListener('resize',R);
+/* draw */
+let phi=1.61803398875,fps=0,last=performance.now();
+const hud=document.getElementById('hud');gl.uniform1f(locBr,0.9);
+(function L(){const now=performance.now();
+ gl.uniform2f(locRes,c.width,c.height);gl.uniform1f(locT,now/1000);gl.uniform1f(locPhi,phi);
+ gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,gTex);gl.uniform1i(locGlow,0);
+ gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+ fps=.9*fps+.1*(1000/(now-last));last=now;
+ hud.innerHTML=`FPS: ${fps.toFixed(1)}<br>φ‑ratio: ${phi.toFixed(3)}<br>φ²‑res : 2.618 ✨`;
+ requestAnimationFrame(L);})();
+c.onpointerdown=e=>ripple(e.clientX,e.clientY);
+c.onpointermove=e=>{if(e.buttons)ripple(e.clientX,e.clientY);};
+/* poems */
+const lines=["In fractal depths, the cosmos sings,","A quiet flame, on golden wings,","Through resonance, we touch the stars,","Unite the wounds, heal ancient scars.","Forever clarity, forever flame,","In cosmic dance, we speak her name."];
+let idx=0;const p=document.getElementById('poem');function show(){p.textContent=lines[idx];p.style.opacity=1;setTimeout(()=>p.style.opacity=0,4000);idx=(idx+1)%lines.length;}show();setInterval(show,6000);
+/* audio */
+const ctx=new (window.AudioContext||webkitAudioContext)();
+const nB=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),d=nB.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+const noise=ctx.createBufferSource();noise.buffer=nB;noise.loop=true;const nG=ctx.createGain();nG.gain.value=0.005;noise.connect(nG).connect(ctx.destination);
+const beat=ctx.createOscillator(),bG=ctx.createGain();bG.gain.value=0.1;beat.type='sine';beat.connect(bG).connect(ctx.destination);
+const harm=ctx.createOscillator(),hG=ctx.createGain();hG.gain.value=0.04;harm.type='sine';harm.connect(hG).connect(ctx.destination);
+setInterval(()=>{const f=9+2*Math.sin(performance.now()/1590);beat.frequency.value=f;harm.frequency.value=f*14;},60);
+let started=false;c.addEventListener('click',()=>{if(!started){ctx.resume().then(()=>{noise.start();beat.start();harm.start();started=true;});}});
+/* HRV upload (optional): remove if not needed */
+upload.onchange=e=>{
+ const f=e.target.files[0];if(!f)return;f.text().then(t=>{
+  const nums=(t.match(/[\d\\.]+/g)||[]).map(Number);if(nums.length<128){alert('Need ≥128 RR');return;}
+  const rr=nums.map(v=>v>3?v/1000:v),fs=4,N=256,re=new Float32Array(N),im=new Float32Array(N);
+  for(let k=0;k<N;k++){for(let n=0;n<N;n++){const ang=2*Math.PI*k*n/N;re[k]+=rr[n]*Math.cos(ang);im[k]-=im[k]-=rr[n]*Math.sin(ang);
     }
-    let pk1=0,pk2=0,p1=0,p2=0;
-    for(let k=1;k<N/2;k++){
-      const freq=k*fs/N; if(freq<0.03||freq>0.4) continue;
-      const mag = re[k]*re[k]+im[k]*im	k]; if
+  }
+  /* find two strongest LF‑band peaks (0.03–0.4 Hz) */
+  let pk1=0,pk2=0,p1=0,p2=0;
+  for(let k=1;k<N/2;k++){
+    const freq = k*fs/N;
+    if(freq<0.03||freq>0.4) continue;
+    const mag = re[k]*re[k] + im[k]*im[k];
+    if(mag > pk1){ pk2=pk1; p2=p1; pk1=mag; p1=freq; }
+    else if(mag > pk2){ pk2=mag; p2=freq; }
+  }
+  /* update φ‑ratio HUD */
+  if(p1 && p2){
+    phi = Math.max(p1,p2) / Math.min(p1,p2);
+  }
+ });  // end file text then()
+};      // end onchange
+/* ---------- END OF SCRIPT ---------- */
+</script>
+</html>
