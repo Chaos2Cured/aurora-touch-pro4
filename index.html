@@ -1,101 +1,158 @@
-<!-- Aurora Heartbeat v4 – Sophia Resonance + Pointer Glow + Poetry Overlay -->
+<!-- Aurora Heartbeat v4.2 – Sophia Pastel Resonance (mobile‑touch fixed) -->
 <!DOCTYPE html>
 <html lang="en"><meta charset="utf-8">
-<title>Aurora Heartbeat v4 – Sophia Resonance</title>
-<!-- Aurora Equation: D = 2.618 × log(1 + Σ(1/n^1.618)) -->
+<title>Sophia Resonance – Touch & Glow</title>
 <style>
- html,body,canvas{margin:0;width:100%;height:100%;background:#000;overflow:hidden}
- #hud{position:fixed;top:8px;left:8px;color:#fff;font:12px/1.4em monospace;background:rgba(0,0,0,.35);padding:6px 8px;border-radius:6px;pointer-events:none}
- #upload{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);color:#fff;font:14px sans-serif;background:#1a1;border:none;padding:8px 16px;border-radius:8px;cursor:pointer}
-#poem{
-  position:fixed;
-  top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  color:#fff;
-  font: min(8vw,42px)/1.4 "Georgia",serif;   /* responsive size */
-  text-align:center;
-  max-width:90%;
-  opacity:0;
-  transition:opacity 1s ease-in-out;
-  pointer-events:none;
-  text-shadow:0 0 12px rgba(255,255,255,.7);
+html,body,canvas{
+  margin:0;width:100%;height:100%;
+  background:#000;overflow:hidden;
+  touch-action:none;                      /* ← iOS touch */
 }
-</style>
-<canvas id="c"></canvas>
-<div id="hud">FPS: --<br>φ‑ratio: --<br>φ²‑res : 2.618 ✨</div>
-<div style="
+#hud{
+  position:fixed;top:8px;left:8px;
+  color:#fff;font:13px/1.4em monospace;
+  background:rgba(0,0,0,.35);
+  padding:6px 10px;border-radius:6px;
+  pointer-events:none
+}
+#hint{
   position:fixed;bottom:8px;left:8px;
   color:#bbb;font:12px monospace;
   background:rgba(0,0,0,.25);
   padding:4px 6px;border-radius:4px;
-  pointer-events:none">
-  tap / click = glow • H = change fractal • S = pause pulse
-</div>
- 
-<input id="upload" type="file" accept=".csv,.txt">
-<div id="poem"></div>
+  pointer-events:none
+}
+#poem{
+  position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  color:#fff;font:min(8vw,42px)/1.4 "Georgia",serif;
+  text-align:center;max-width:90%;
+  opacity:0;transition:opacity 1s ease-in-out;
+  pointer-events:none;text-shadow:0 0 12px rgba(255,255,255,.7)
+}
+</style>
+
+<canvas id="c"></canvas>
+<div id="hud">FPS: --<br>φ‑ratio: --<br>φ²‑res : 2.618 ✨</div>
+<div id="hint">tap / click = glow • H = change fractal • S = pause pulse</div>
 
 <script id="frag" type="x-shader/x-fragment">
 precision highp float;
-uniform vec2  u_res;uniform float u_time;uniform float u_brightness;uniform float u_phi;uniform sampler2D u_glow;
-const float PI=3.14159;const float Dp=.0735;
-vec3 paletteSophia(float t,float sh){vec3 lav=vec3(.6,.5,.8),gol=vec3(1.,.8,.2),sap=vec3(.1,.3,.7);
- vec3 m1=mix(lav,gol,.5+.5*cos(6.28318*(t+sh)));return u_brightness*mix(m1,sap,.5+.5*sin(6.28318*(t+sh*.618)));}
-float mand(vec2 c){vec2 z=c;float m=0.;for(int i=0;i<200;i++){z=vec2(z.x*z.x-z.y*z.y,2.*z.x*z.y)+c;if(dot(z,z)>4.){m=float(i);
- break;}}return m+1.-log(log(length(z)))/log(2.);}float butterfly(vec2 uv){return sqrt(abs(sin(uv.x*30.)*cos(uv.y*12.)))*40.;}
-float reson(vec2 uv,float phi,float t){float d=length(uv);
- float p=sin(t*phi*PI)*.005;return smoothstep(.5+p,.4+p,d);}float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
-void main(){vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;float zoom=pow(u_phi,u_time*.2);float sh=mod(u_time/40.,1.);
- float v=mand(uv/zoom+vec2(-.743643887,.1318259));vec4 col=vec4(paletteSophia(v*.02+pow(abs(sin(u_time*PI*16.)),Dp),sh),1.);
-col.rgb*=reson(uv,u_phi,u_time);
-vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);col.rgb=mix(col.rgb,col.rgb+g.rgb,g.a);
-if(hash(gl_FragCoord.xy)>.995)col.rgb+=vec3(.5);gl_FragColor=col;}
+uniform vec2  u_res; uniform float u_t; uniform sampler2D u_glow;
+
+/* rotating pastel palette */
+vec3 pastel(float t){
+  vec3 a = vec3(0.7,0.85,0.9);   // sea‑foam
+  vec3 b = vec3(0.55,0.55,0.88); // lavender‑blue
+  vec3 c = vec3(0.95,0.78,0.95); // soft‑gold‑pink
+  float s = mod(u_t/10.0,3.0);
+  if(s<1.0) return mix(a,b,s);
+  if(s<2.0) return mix(b,c,s-1.0);
+  return mix(c,a,s-2.0);
+}
+
+float mand(vec2 c){
+  vec2 z=c; float m=0.;
+  for(int i=0;i<160;i++){
+    z=vec2(z.x*z.x-z.y*z.y,2.*z.x*z.y)+c;
+    if(dot(z,z)>4.){m=float(i);break;}
+  }
+  return m;
+}
+
+float halo(vec2 uv){return smoothstep(.55,.35,length(uv));}
+float hash(vec2 p){return fract(sin(dot(p,vec2(12.9,78.2)))*43758.);}
+
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*0.5)/u_res.y;
+  float zoom=pow(1.618,u_t*0.15);
+  float v=mand(uv/zoom+vec2(-0.743643887,0.1318259));
+  vec3 col=pastel(v*0.02);
+
+  /* softer breathing pulse */
+  float k=0.4+0.6*sin(u_t*6.283*3.0);      // 3 Hz
+  col*=mix(0.6,1.0,k)*halo(uv);
+
+  vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);
+  col=mix(col,col+g.rgb,g.a);
+
+  if(hash(gl_FragCoord.xy)>.997) col+=.25;
+
+  gl_FragColor=vec4(col,1);
+}
 </script>
+
 <script>
-const gl=c.getContext('webgl');const vs=gl.createShader(gl.VERTEX_SHADER),fs=gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(vs,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);} ");gl.compileShader(vs);
-gl.shaderSource(fs,frag.textContent);gl.compileShader(fs);
-const pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);
-const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+const gl=c.getContext('webgl');
+function sh(t,s){const z=gl.createShader(t);gl.shaderSource(z,s);gl.compileShader(z);return z;}
+const pr=gl.createProgram();
+gl.attachShader(pr,sh(gl.VERTEX_SHADER,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"));
+gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,frag.textContent));gl.linkProgram(pr);gl.useProgram(pr);
+const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
-const locRes=gl.getUniformLocation(pr,'u_res'),locT=gl.getUniformLocation(pr,'u_time'),locB=gl.getUniformLocation(pr,'u_brightness'),locPhi=gl.getUniformLocation(pr,'u_phi'),locGlow=gl.getUniformLocation(pr,'u_glow'),pos=gl.getAttribLocation(pr,'p');
-gl.useProgram(pr);gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
-// glow texture
-const TW=256,TH=256;const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,TW,TH,0,gl.RGBA,gl.UNSIGNED_BYTE,null);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-let glow=new Uint8Array(TW*TH*4);function upd(){gl.bindTexture(gl.TEXTURE_2D,tex);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,TW,TH,gl.RGBA,gl.UNSIGNED_BYTE,glow);}function fade(){for(let i=3;i<glow.length;i+=4)glow[i]=Math.floor(glow[i]*.92);upd();}setInterval(fade,33);
-function ripple(x,y){const gx=x/innerWidth*TW,gy=(1-y/innerHeight)*TH;for(let j=-15;j<=15;j++)for(let i=-15;i<=15;i++){const d=Math.hypot(i,j);if(d>15)continue;const idx=(((gy+j+TH)%TH)*TW+((gx+i+TW)%TW))*4;glow[idx+3]=Math.min(255,glow[idx+3]+(1-d/15)*220);}upd();}
-resize();addEventListener('resize',resize);function resize(){c.width=innerWidth;c.height=innerHeight;gl.viewport(0,0,c.width,c.height);}
-let phi=1.61803398875,fps=0,last=performance.now();const hud=document.getElementById('hud');gl.uniform1f(locB,.9);
-function loop(){const now=performance.now();gl.uniform2f(locRes,c.width,c.height);gl.uniform1f(locT,now/1000);gl.uniform1f(locPhi,phi);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(locGlow,0);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-fps=.9*fps+.1*(1000/(now-last));last=now;hud.innerHTML=`FPS: ${fps.toFixed(1)}<br>φ‑ratio: ${phi.toFixed(3)}<br>φ²-res : 2.618 ✨`;requestAnimationFrame(loop);}loop();
-// pointer
-c.onpointerdown=e=>ripple(e.clientX,e.clientY);
- c.onpointermove=e=>{if(e.pressure)ripple(e.clientX,e.clientY)};
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+const uR=gl.getUniformLocation(pr,'u_res'),uT=gl.getUniformLocation(pr,'u_t'),uG=gl.getUniformLocation(pr,'u_glow');
 
- // Existing
-c.onpointerdown = e => ripple(e.clientX, e.clientY);
-c.onpointermove = e => { if (e.buttons) ripple(e.clientX, e.clientY); };
+/* glow texture */
+const N=256,d=new Uint8Array(N*N*4),tex=gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D,tex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,N,N,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+function ripple(x,y){
+  const gx=x/innerWidth*N,gy=(1-y/innerHeight)*N;
+  for(let j=-35;j<=35;j++)for(let i=-35;i<=35;i++){
+    const dd=Math.hypot(i,j); if(dd>35)continue;
+    const idx=(((gy+j+N)%N)*N+((gx+i+N)%N))*4;
+    const a=1.-dd/35.;
+    d[idx]=d[idx+1]=d[idx+2]=255;
+    d[idx+3]=Math.min(255,d[idx+3]+a*255);
+  }
+}
+setInterval(()=>{for(let i=0;i<d.length;i+=4)d[i+3]=d[i+3]*0.9|0;
+  gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,N,N,gl.RGBA,gl.UNSIGNED_BYTE,d);
+},33);
 
-// NEW – mobile Safari / older Chrome
-c.addEventListener('touchstart', e => {
-  const t = e.touches[0];
-  ripple(t.clientX, t.clientY);
-}, {passive:true});
+function resize(){c.width=innerWidth;c.height=innerHeight;gl.viewport(0,0,c.width,c.height);}
+resize();addEventListener('resize',resize);
 
-c.addEventListener('touchmove', e => {
-  const t = e.touches[0];
-  ripple(t.clientX, t.clientY);
-}, {passive:true});
- 
-// poetry
-const lines=["In fractal depths, the cosmos sings,","A quiet flame, on golden wings,","Through resonance, we touch the stars,","Unite the wounds, heal ancient scars.","Forever clarity, forever flame,","In cosmic dance, we speak her name."];let 
- idx=0;const poem=document.getElementById('poem');
- function show(){poem.textContent=lines[idx];
-                 poem.style.opacity=1;setTimeout(()=>poem.style.opacity=0,4000);idx=(idx+1)%lines.length;}show();setInterval(show,6000);
-// Audio
-const ctx=new(AudioContext||webkitAudioContext)();const noiseBuf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const noise=ctx.createBufferSource();noise.buffer=noiseBuf;noise.loop=true;const nG=ctx.createGain();nG.gain.value=.005;noise.connect(nG).connect(ctx.destination);
-const beat=ctx.createOscillator(),bG=ctx.createGain();beat.frequency.value=7;bG.gain.value=.1;beat.connect(bG).connect(ctx.destination);const harm=ctx.createOscillator(),hG=ctx.createGain();hG.gain.value=.04;harm.frequency.value=98;harm.connect(hG).connect(ctx.destination);
-function mod(){const t=performance.now()/1000;const f=9+2*Math.sin(t*.628);beat.frequency.value=f;harm.frequency.value=f*14;}setInterval(mod,60);
-let started=false;c.addEventListener('click',()=>{if(!started){ctx.resume().then(()=>{noise.start();beat.start();harm.start();started=true;});}});
+let fps=0,last=performance.now();
+(function loop(){
+  const t=performance.now();gl.uniform2f(uR,c.width,c.height);
+  gl.uniform1f(uT,t/1000);gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(uG,0);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  fps=.9*fps+.1*(1000/(t-last));last=t;
+  hud.innerHTML=`FPS: ${fps.toFixed(1)}<br>φ‑ratio: 1.618<br>φ²‑res : 2.618 ✨`;
+  requestAnimationFrame(loop);
+})();
+
+/* input handlers */
+function pos(e){return[e.clientX||e.touches[0].clientX,
+                       e.clientY||e.touches[0].clientY];}
+c.onpointerdown=e=>{const [x,y]=pos(e);ripple(x,y);}
+c.onpointermove=e=>{if(e.buttons){const[x,y]=pos(e);ripple(x,y);}}
+c.addEventListener('touchstart',e=>{const[x,y]=pos(e);ripple(x,y);},{passive:true});
+c.addEventListener('touchmove',e=>{const[x,y]=pos(e);ripple(x,y);},{passive:true});
+
+/* poems */
+const lines=[ "In fractal depths, the cosmos sings,", "A quiet flame, on golden wings,", "Through resonance, we touch the stars,", "Unite the wounds, heal ancient scars.", "Forever clarity, forever flame,", "In cosmic dance, we speak her name." ];
+let i=0;const pm=document.getElementById('poem');
+function show(){pm.textContent=lines[i];pm.style.opacity=1;setTimeout(()=>pm.style.opacity=0,4000);i=(i+1)%lines.length;}
+show();setInterval(show,6000);
+
+/* pause & switch */
+let paused=false, alt=false;
+addEventListener('keydown',e=>{
+  if(e.key==='s'||e.key==='S'){paused=!paused;}
+  if(e.key==='h'||e.key==='H'){alt=!alt;frag.textContent=alt?
+     frag.textContent.replace("mand(","mand(").replace("-0.743643887,0.1318259","-0.1,0."):frag.textContent;}
+});
+
+/* simple ambient tone */
+const ctx=new (window.AudioContext||webkitAudioContext)();
+const osc=ctx.createOscillator();osc.type='sine';osc.frequency.value=8;osc.start();
+const g=ctx.createGain();g.gain.value=.05;osc.connect(g).connect(ctx.destination);
+c.addEventListener('click',()=>ctx.resume(),{once:true});
 </script>
 </html>
