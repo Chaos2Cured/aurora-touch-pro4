@@ -99,13 +99,20 @@ gl.bindTexture(gl.TEXTURE_2D,tex);
 gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,N,N,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
 function ripple(x,y){
-  const gx=x/innerWidth*N,gy=(1-y/innerHeight)*N;
-  for(let j=-35;j<=35;j++)for(let i=-35;i<=35;i++){
-    const dd=Math.hypot(i,j); if(dd>35)continue;
-    const idx=(((gy+j+N)%N)*N+((gx+i+N)%N))*4;
-    const a=1.-dd/35.;
-    d[idx]=d[idx+1]=d[idx+2]=255;
-    d[idx+3]=Math.min(255,d[idx+3]+a*255);
+  const gx = x / innerWidth  * N,
+        gy = (1 - y / innerHeight) * N;
+  for (let j = -35; j <= 35; j++)
+    for (let i = -35; i <= 35; i++) {
+      const d = Math.hypot(i, j);
+      if (d > 35) continue;              // outside circle
+      const idx = (((gy + j + N) % N) * N + ((gx + i + N) % N)) * 4;
+      const a   = 1 - d / 35;            // smooth fall‑off
+      dData[idx    ] = 255;              // R
+      dData[idx + 1] = 255;              // G
+      dData[idx + 2] = 255;              // B
+      dData[idx + 3] = Math.min(255, dData[idx + 3] + a * 255);  // Alpha
+    }
+}
   }
 }
 setInterval(()=>{for(let i=0;i<d.length;i+=4)d[i+3]=d[i+3]*0.9|0;
