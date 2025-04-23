@@ -38,7 +38,14 @@ html,body,canvas{
 <div id="poem"></div>
 <script id="frag" type="x-shader/x-fragment">
 precision highp float;
-uniform vec2  u_res; uniform float u_t; uniform sampler2D u_glow;
+uniform vec2  u_res;
+uniform float u_t;
+uniform sampler2D u_glow;
+uniform float u_zoom;
+uniform vec2  u_center;
+
+  let zoom = 1.0;
+let center = {x: -0.743643887, y: 0.1318259};   // start hotspot
 
 /* rotating pastel palette */
 vec3 pastel(float t){                         // t = fractal value
@@ -49,7 +56,9 @@ vec3 pastel(float t){                         // t = fractal value
   vec3 base = (s<1.0)? mix(a,b,s) : (s<2.0)? mix(b,c,s-1.0) : mix(c,a,s-2.0);
   return mix(vec3(0.0), base, clamp(t,0.0,1.0));   // modulate by t → brings back detail
 }
-
+  
+float v = mand( uv / u_zoom + u_center );
+  
 float mand(vec2 c){
   vec2 z=c; float m=0.;
   for(int i=0;i<160;i++){
@@ -65,12 +74,12 @@ float hash(vec2 p){return fract(sin(dot(p,vec2(12.9,78.2)))*43758.);}
 void main(){
   vec2 uv=(gl_FragCoord.xy-u_res*0.5)/u_res.y;
   float zoom=pow(1.618,u_t*0.15);
-  float v=mand(uv/zoom+vec2(-0.743643887,0.1318259));
+  float v = mand( uv / u_zoom + u_center );
 vec3 col = pastel( v * 0.05 );      // was pastel(v*0.02)
 
   /* softer breathing pulse */
   float k=0.4+0.6*sin(u_t*6.283*3.0);      // 3 Hz
-  col*=mix(0.6,1.0,k)*halo(uv);
+  col*= 0.6 + 0.4 * k;
 
   vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);
   col=mix(col,col+g.rgb,g.a);
@@ -82,6 +91,8 @@ vec3 col = pastel( v * 0.05 );      // was pastel(v*0.02)
 </script>
 
 <script>
+  const uZoom   = gl.getUniformLocation(pr,'u_zoom');
+const uCenter = gl.getUniformLocation(pr,'u_center');
 const gl=c.getContext('webgl');
 function sh(t,s){const z=gl.createShader(t);gl.shaderSource(z,s);gl.compileShader(z);return z;}
 const pr=gl.createProgram();
@@ -91,6 +102,12 @@ const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 const uR=gl.getUniformLocation(pr,'u_res'),uT=gl.getUniformLocation(pr,'u_t'),uG=gl.getUniformLocation(pr,'u_glow');
+let zoom   = 1.0;            // ← new
+let center = { x:-0.743643887, y:0.1318259 };  // ← new
+  
+
+const uZoom   = gl.getUniformLocation(pr,'u_zoom');
+const uCenter = gl.getUniformLocation(pr,'u_center');
 
 /* glow texture */
 /* glow texture */
@@ -109,18 +126,16 @@ function ripple(x, y){
   for (let j = -35; j <= 35; j++){
     for (let i = -35; i <= 35; i++){
       const dist = Math.hypot(i, j);
-      if (dist > 35) continue;               // outside circle
-      const idx = (((gy + j + N) % N) * N +
-                   ((gx + i + N) % N)) * 4;
-      const a   = 1 - dist / 35;             // smooth fall‑off (0‑1)
-
-      d[idx    ] = 255;                      // R
-      d[idx + 1] = 255;                      // G
-      d[idx + 2] = 255;                      // B
-      d[idx + 3] = Math.min(255, d[idx + 3] + a * 255);   // Alpha
+      if (dist > 35) continue;
+      const idx = (((gy + j + N) % N) * N + ((gx + i + N) % N)) * 4;
+      const alpha = 1 - dist / 35;
+      d[idx    ] = 255;   // R
+      d[idx + 1] = 255;   // G
+      d[idx + 2] = 255;   // B
+      d[idx + 3] = 255;   // full alpha so it’s ALWAYS visible this frame
     }
   }
-}                                            // ← closes ripple
+}
 /* -----------------------------------------------   */
 
 /* fade the glow texture every ~33 ms */
@@ -138,7 +153,11 @@ resize();addEventListener('resize',resize);
 let fps=0,last=performance.now();
 (function loop(){
   const t=performance.now();gl.uniform2f(uR,c.width,c.height);
-  gl.uniform1f(uT,t/1000);gl.activeTexture(gl.TEXTURE0);
+  gl.uniform1f(uT,t/1000);
+
+gl.uniform1f(uZoom,   zoom);
+gl.uniform2f(uCenter, center.x, center.y);
+  gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(uG,0);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   fps=.9*fps+.1*(1000/(t-last));last=t;
